@@ -1,0 +1,18 @@
+# Home Assistant custom-integration test environment.
+pytest-homeassistant-custom-component==0.13.357
+zwave-js-server-python==0.73.0
+aiousbwatcher==1.1.2
+serialx==1.8.2
+home-assistant-frontend==20260729.7
+
+# HomePASS runtime dependencies from the integration manifest.
+cryptography==48.0.1
+webauthn==2.8.0
+qrcode==8.2
+pyNukiBT==0.0.20
+async-timeout==5.0.1
+
+# Project quality tools and third-party typing.
+mypy==2.3.0
+ruff==0.15.20
+types-qrcode

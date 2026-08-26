@@ -1,0 +1,32 @@
+title = "HomePASS Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# Do not add real secrets to an allowlist. If a false positive cannot be removed by
+# using synthetic data, add the narrowest possible path-and-rule exclusion and
+# explain why the matched value is demonstrably synthetic.
+
+[[rules]]
+id = "generic-api-key"
+
+    [[rules.allowlists]]
+    description = "GoToTags NTAG424 schema field names are identifiers, not key material"
+    condition = "AND"
+    paths = ['''^custom_components/homepass/frontend/homepass-nfc-provisioner\.js$''']
+    regexTarget = "match"
+    regexes = ['''chip\.ntag424\.newKeys\.key[0-4]''']
+
+    [[rules.allowlists]]
+    description = "Historical test envelope contains only the Base64 text 'authenticatedtag'"
+    condition = "AND"
+    commits = ["ce94007de4f22ac87b71685527f912c6580ed14a"]
+    paths = ['''^tests/test_vault_models\.py$''']
+    regexes = ['''^YXV0aGVudGljYXRlZHRhZw==$''']
+
+    [[rules.allowlists]]
+    description = "Historical test envelope contains only synthetic authentication metadata"
+    condition = "AND"
+    commits = ["fe6816d8fd2c47354d5cd08141cc212b4a04ff36"]
+    paths = ['''^tests/test_vault_models\.py$''']
+    regexes = ['''^YXV0aGVudGljYXRlZC1tZXRhZGF0YQ==$''']

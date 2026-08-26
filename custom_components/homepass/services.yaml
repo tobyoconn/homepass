@@ -1,0 +1,882 @@
+ping:
+
+configure_nfc:
+  name: Configure NFC
+  description: Saves the public HTTPS address required for NFC tags and passkey enrollment.
+  fields:
+    nfc_public_origin:
+      name: Nabu Casa HTTPS address
+      description: The fixed public HTTPS origin used for NFC taps and passkeys.
+      required: true
+      selector:
+        text:
+          type: url
+
+get_nuki_fingerprint_status:
+  name: Get Nuki fingerprint status
+  description: Returns non-biometric guided enrollment status for one HomePASS User.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+get_nuki_storage_status:
+  name: Get Nuki storage status
+  description: Returns a read-only, secret-free summary of Nuki PIN storage and HomePASS-linked fingerprint status.
+
+start_nuki_fingerprint_enrollment:
+  name: Start Nuki fingerprint enrollment
+  description: Links a User's synchronized Nuki PIN authorization before scanning in the Nuki app.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+complete_nuki_fingerprint_enrollment:
+  name: Complete Nuki app fingerprint step
+  description: Marks the Nuki app scan step complete while HomePASS waits for a matching fingerprint event.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+get_about:
+  name: Get About information
+  description: Returns presentation-safe HomePASS release and installation identity.
+
+get_property_settings:
+  name: Get Property Settings
+  description: Returns the homeowner-facing identity for this HomePASS installation.
+
+save_property_settings:
+  name: Save Property Settings
+  description: Validates and saves the homeowner-facing property identity.
+  fields:
+    settings:
+      required: true
+      selector:
+        object:
+
+get_notification_preferences:
+  name: Get notification preferences
+  description: Returns notification preferences and discovered Companion App devices.
+
+save_notification_preferences:
+  name: Save notification preferences
+  description: Validates and saves notification preferences without sending notifications.
+  fields:
+    preferences:
+      required: true
+      selector:
+        object:
+
+list_recent_activity:
+  name: List recent activity
+  description: Returns recent homeowner-facing HomePASS activity.
+  fields:
+    limit:
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: box
+    event_types:
+      required: false
+      selector:
+        object:
+    access_point_id:
+      required: false
+      selector:
+        text:
+    person_id:
+      required: false
+      selector:
+        text:
+
+create_person:
+  fields:
+    display_name:
+      required: true
+      example: Cleaner
+      selector:
+        text:
+    description:
+      required: false
+      selector:
+        text:
+    enabled:
+      required: false
+      default: true
+      selector:
+        boolean:
+    notes:
+      required: false
+      selector:
+        text:
+          multiline: true
+
+update_person:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    display_name:
+      required: false
+      selector:
+        text:
+    description:
+      required: false
+      selector:
+        text:
+    enabled:
+      required: false
+      selector:
+        boolean:
+    notes:
+      required: false
+      selector:
+        text:
+          multiline: true
+
+delete_person:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+get_person:
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+create_schedule:
+  fields:
+    name:
+      required: true
+      example: Business Hours
+      selector:
+        text:
+    time_zone:
+      required: true
+      example: America/Los_Angeles
+      selector:
+        text:
+    enabled:
+      required: false
+      default: true
+      selector:
+        boolean:
+    valid_from:
+      required: false
+      selector:
+        datetime:
+    valid_until:
+      required: false
+      selector:
+        datetime:
+    weekly_rules:
+      required: false
+      default: []
+      selector:
+        object:
+
+update_schedule:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        text:
+    name:
+      required: false
+      selector:
+        text:
+    time_zone:
+      required: false
+      selector:
+        text:
+    enabled:
+      required: false
+      selector:
+        boolean:
+    valid_from:
+      required: false
+      selector:
+        datetime:
+    valid_until:
+      required: false
+      selector:
+        datetime:
+    weekly_rules:
+      required: false
+      selector:
+        object:
+
+delete_schedule:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        text:
+
+get_schedule:
+  fields:
+    schedule_id:
+      required: true
+      selector:
+        text:
+
+list_schedules:
+
+get_door_details:
+  name: Get door details
+  description: Returns current access policy grouped for one managed door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+get_person_policy_details:
+  name: Get User policy details
+  description: Returns current access policy grouped across all durable doors for one User.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+get_policy_explanation:
+  name: Get policy explanation
+  description: Returns a homeowner-facing explanation for one unavailable access relationship.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+get_dashboard_attention:
+  name: Get dashboard attention
+  description: Returns synchronization issues that may require homeowner action.
+
+get_person_schedule:
+  name: Get User schedule
+  description: Returns the effective schedule and editor concurrency state for a User.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+save_person_schedule:
+  name: Save User schedule
+  description: Atomically applies a schedule to all of a User's doors or a selected subset.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    time_zone:
+      required: true
+      selector:
+        text:
+    valid_from:
+      required: true
+      selector:
+        datetime:
+    valid_until:
+      required: true
+      selector:
+        datetime:
+    weekly_rules:
+      required: true
+      selector:
+        object:
+    expected_person_updated_at:
+      required: true
+      selector:
+        datetime:
+    schedule_id:
+      required: true
+      selector:
+        text:
+    expected_schedule_revision:
+      required: true
+      selector:
+        number:
+          min: 1
+    enabled:
+      required: false
+      default: true
+      selector:
+        boolean:
+    access_point_ids:
+      required: false
+      description: Optional door subset. Omit to retain the legacy whole-User behavior.
+      selector:
+        object:
+
+list_access_points:
+
+list_available_access_points:
+  name: List available locks
+  description: Returns compatible locks that have not been added to HomePASS.
+
+enroll_access_point:
+  name: Add Door
+  description: Adds one available compatible lock to HomePASS managed doors.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+enroll_home_assistant_access_point:
+  name: Add Home Assistant Door
+  description: Adds an administrator-selected Home Assistant device and its control/status entities to HomePASS.
+  fields:
+    display_name:
+      required: true
+      selector:
+        text:
+    device_id:
+      required: true
+      selector:
+        device:
+    control_profile:
+      required: true
+      selector:
+        select:
+          options:
+            - lock
+            - garage_cover
+            - garage_toggle
+            - electric_strike
+    control_entity_id:
+      required: true
+      selector:
+        entity:
+    status_entity_id:
+      required: false
+      selector:
+        entity:
+    status_inverted:
+      required: false
+      default: false
+      selector:
+        boolean:
+    pulse_seconds:
+      required: false
+      default: 1.0
+      selector:
+        number:
+          min: 0.1
+          max: 10
+          step: 0.1
+          mode: box
+
+update_access_point:
+  name: Update Door
+  description: Updates the friendly HomePASS name or separate open/closed status sensor for a managed door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    display_name:
+      required: false
+      selector:
+        text:
+    status_entity_id:
+      required: false
+      selector:
+        entity:
+    status_inverted:
+      required: false
+      default: false
+      selector:
+        boolean:
+
+remove_access_point:
+  name: Remove from HomePASS
+  description: Removes one unassigned managed door without changing Home Assistant.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+lock_access_point:
+  name: Lock Door
+  description: Sends an explicit homeowner-requested lock command to one managed HomePASS door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+unlock_access_point:
+  name: Unlock Door
+  description: Sends an explicit homeowner-requested unlock command to one managed HomePASS door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+give_access:
+  name: Give access
+  description: >-
+    Provisions a PIN for a User and access point, retains it in the encrypted
+    credential vault, and never returns the PIN.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    pin:
+      required: true
+      selector:
+        text:
+          type: password
+
+update_access:
+  name: Update access
+  description: >-
+    Applies the selected Access Points to a User, provisioning additions and
+    removing assignments that are no longer selected.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_ids:
+      required: true
+      selector:
+        object:
+
+retry_synchronization:
+  name: Retry synchronization
+  description: Safely resumes synchronization for one User and door relationship.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+list_people:
+
+get_user_setup_options:
+  name: Get User setup options
+  description: Returns durable doors and Schedules for the guided Add User workflow.
+
+create_user:
+  name: Create User
+  description: Creates one User and optionally orchestrates selected keypad door assignments.
+  fields:
+    request_id:
+      required: true
+      selector:
+        text:
+    display_name:
+      required: true
+      selector:
+        text:
+    description:
+      required: false
+      selector:
+        text:
+    notes:
+      required: false
+      selector:
+        text:
+          multiline: true
+    pin:
+      required: false
+      description: Optional 4 to 10 digit PIN. Required when assigning keypad doors.
+      selector:
+        text:
+          type: password
+    access_point_ids:
+      required: true
+      selector:
+        object:
+    schedule:
+      required: true
+      selector:
+        object:
+
+assign_user_access:
+  name: Complete User access setup
+  description: >-
+    Assigns a missing PIN and adds one or more doors without replacing existing
+    assignments.
+  fields:
+    request_id:
+      required: true
+      selector:
+        text:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_ids:
+      required: true
+      selector:
+        object:
+    schedule_id:
+      required: false
+      selector:
+        text:
+    schedule:
+      required: false
+      selector:
+        object:
+    pin:
+      required: false
+      selector:
+        text:
+          type: password
+
+test_zwave_pin_sync:
+  name: Experimental Z-Wave PIN synchronization
+  description: >-
+    Experimental developer action for testing ephemeral PIN synchronization.
+    PIN values are not persisted or returned.
+  fields:
+    lock_entity_id:
+      required: true
+      selector:
+        entity:
+          domain: lock
+          integration: zwave_js
+    display_name:
+      required: true
+      selector:
+        text:
+    pin:
+      required: true
+      selector:
+        text:
+          type: password
+
+test_zwave_delete_user:
+  name: Experimental Z-Wave slot cleanup
+  description: >-
+    Experimental developer action for clearing the user or numbered User Code
+    slot selected by the synchronization test.
+  fields:
+    lock_entity_id:
+      required: true
+      selector:
+        entity:
+          domain: lock
+          integration: zwave_js
+    user_id:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+
+test_vault_crypto_runtime:
+  name: Test credential-vault cryptography runtime
+  description: >-
+    Input-free in-memory compatibility check for the AES-256-GCM API. Returns
+    no cryptographic material and performs no persistence.
+
+create_nfc_enrollment:
+  name: Create NFC passkey enrollment
+  description: >-
+    Creates an expiring, single-use enrollment URL for one existing HomePASS User.
+    The action is restricted to Home Assistant administrators.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    expires_in_hours:
+      required: false
+      default: 24
+      selector:
+        number:
+          min: 1
+          max: 168
+          step: 1
+          mode: box
+
+get_nfc_enrollment_status:
+  name: Get NFC enrollment status
+  description: >-
+    Returns non-secret NFC passkey enrollment and Door assignment status for one
+    HomePASS User. The action is restricted to Home Assistant administrators.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+list_nfc_enrollment_statuses:
+  name: List NFC enrollment statuses
+  description: >-
+    Returns non-secret NFC passkey and Door assignment summaries for all HomePASS
+    Users. The action is restricted to Home Assistant administrators.
+
+revoke_nfc_enrollment:
+  name: Revoke NFC enrollment
+  description: >-
+    Revokes all NFC passkeys, pending enrollment links, and NFC Door assignments
+    for one HomePASS User. The action is restricted to Home Assistant administrators.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+
+create_nfc_test_tag:
+  name: Create NTAG216 test tag
+  description: >-
+    Creates a revocable static Nabu Casa URL for temporary NTAG216 testing. The URL
+    still requires an enrolled passkey and current Door authorization, but can be
+    copied and must not be used as a permanent production tag.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    expires_in_hours:
+      required: false
+      default: 168
+      selector:
+        number:
+          min: 1
+          max: 720
+          step: 1
+          mode: box
+
+get_nfc_test_tag_status:
+  name: Get NTAG216 test-tag status
+  description: >-
+    Returns whether a non-expired NTAG216 test URL is active for one HomePASS Door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+revoke_nfc_test_tag:
+  name: Revoke NTAG216 test tag
+  description: >-
+    Immediately revokes every static NTAG216 test URL for one HomePASS Door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+prepare_nfc_tag:
+  name: Prepare NFC door tag
+  description: >-
+    Creates the secure NTAG 424 DNA URL and one-time programming keys for a managed,
+    NFC-capable HomePASS door. The action is restricted to Home Assistant administrators.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    uid_hex:
+      required: true
+      selector:
+        text:
+    meta_read_key:
+      required: false
+      selector:
+        text:
+          type: password
+    file_read_key:
+      required: false
+      selector:
+        text:
+          type: password
+
+prepare_nfc_tag_protection:
+  name: Prepare NFC tag rewrite protection
+  description: >-
+    Creates a one-row GoToTags conversion package for an existing HomePASS NTAG424.
+    The tag remains recoverable with a unique administrator key held by HomePASS.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    public_id:
+      required: true
+      selector:
+        text:
+
+confirm_nfc_tag_protection:
+  name: Confirm NFC tag rewrite protection
+  description: >-
+    Records that GoToTags reported VERIFIED after applying HomePASS rewrite protection.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    public_id:
+      required: true
+      selector:
+        text:
+
+update_nfc_access:
+  name: Update NFC door access
+  description: >-
+    Replaces the NFC-capable doors assigned to one HomePASS User without creating
+    PIN credentials. The User's HomePASS schedule still applies. The action is
+    restricted to Home Assistant administrators.
+  fields:
+    person_id:
+      required: true
+      selector:
+        text:
+    access_point_ids:
+      required: true
+      selector:
+        object:
+
+list_nfc_tags:
+  name: List NFC door tags
+  description: Lists the non-secret identifiers and status of NFC tags registered to a Door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
+revoke_nfc_tag:
+  name: Temporarily disable NFC door tag
+  description: Temporarily disables one NFC tag without affecting other tags, users, or the Door.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    public_id:
+      required: true
+      selector:
+        text:
+
+reinstate_nfc_tag:
+  name: Reinstate NFC door tag
+  description: Re-enables one previously disabled NFC tag.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    public_id:
+      required: true
+      selector:
+        text:
+
+delete_nfc_tag:
+  name: Delete NFC door tag
+  description: Permanently removes one NFC tag registration from HomePASS.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    public_id:
+      required: true
+      selector:
+        text:
+
+list_access_devices:
+  name: List access devices
+  description: >-
+    Lists HomePASS-managed accessory devices and compatible keypads that are
+    ready to be associated with a Door.
+
+add_access_device:
+  name: Add access device
+  description: >-
+    Associates a compatible Home Assistant device, such as a Frient keypad,
+    with one logical HomePASS Door.
+  fields:
+    device_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: true
+      selector:
+        text:
+    display_name:
+      required: false
+      selector:
+        text:
+
+update_access_device:
+  name: Update access device
+  description: Updates the name, Door association, enabled state, or button actions.
+  fields:
+    access_device_id:
+      required: true
+      selector:
+        text:
+    access_point_id:
+      required: false
+      selector:
+        text:
+    display_name:
+      required: false
+      selector:
+        text:
+    enabled:
+      required: false
+      selector:
+        boolean:
+    button_actions:
+      required: false
+      selector:
+        object:
+
+remove_access_device:
+  name: Remove access device
+  description: Removes an accessory association without unpairing it from Home Assistant.
+  fields:
+    access_device_id:
+      required: true
+      selector:
+        text:

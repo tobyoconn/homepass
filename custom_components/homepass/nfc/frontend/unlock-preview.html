@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color" content="#2450e6">
+    <title>Front Door Lock · HomePASS preview</title>
+    <link rel="icon" type="image/svg+xml" href="/homepass_static/assets/homepass-favicon.svg">
+    <link rel="stylesheet" href="/homepass_nfc_static/nfc-access.css?version=1.14.0">
+  </head>
+  <body>
+    <div class="page-shell">
+      <main class="access-card" id="card">
+        <header class="brand-header">
+          <img class="logo" src="/homepass_static/assets/homepass-mark-concept-1.png" alt="HomePASS">
+          <p class="property-context">
+            <span class="property-label">Property</span>
+            <strong class="property-name">Example Residence</strong>
+          </p>
+        </header>
+        <section class="door-hero">
+          <div class="door-symbol" aria-hidden="true">
+            <img src="/homepass_static/assets/nfc-symbol.svg" alt="">
+          </div>
+          <p class="eyebrow" id="eyebrow">Secure NFC access</p>
+          <h1 id="title">Front Door Lock</h1>
+          <p class="message" id="message" hidden></p>
+          <p class="authorization-notice">HomePASS door access is for enrolled, authorized users only. If you are not enrolled, contact the property owner for entry.</p>
+        </section>
+        <div class="access-action">
+          <button type="button" id="primary" disabled>Loading…</button>
+          <div class="status" id="status" role="status" aria-live="polite"></div>
+          <p class="completion-note" id="completion-note" hidden>You’re finished here. You can safely close this page or navigate away.</p>
+        </div>
+        <footer class="trust-footer">
+          <span class="trust-mark" aria-hidden="true">✓</span>
+          <p id="trust-copy">Protected by HomePASS, secure NFC verification, and your device passkey.</p>
+        </footer>
+      </main>
+    </div>
+    <script type="application/json" id="homepass-config">{"mode":"unlock","tapSession":"design-preview","door":"Front Door Lock","property":"Example Residence","expiresInMs":30000}</script>
+    <script src="/homepass_nfc_static/nfc-access.js?version=1.16.4" defer></script>
+  </body>
+</html>

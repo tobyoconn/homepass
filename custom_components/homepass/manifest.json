@@ -1,0 +1,15 @@
+{
+  "domain": "homepass",
+  "name": "HomePASS",
+  "after_dependencies": ["bluetooth", "bluetooth_adapters", "mqtt", "zwave_js"],
+  "codeowners": ["@tobyoconn"],
+  "config_flow": true,
+  "dependencies": ["http", "panel_custom"],
+  "documentation": "https://github.com/tobyoconn/homepass",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/tobyoconn/homepass/issues",
+  "requirements": ["cryptography==48.0.1", "webauthn==2.8.0", "qrcode==8.2", "pyNukiBT==0.0.20"],
+  "single_config_entry": true,
+  "version": "1.17.4"
+}

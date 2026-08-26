@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Closed and locked</title>
+  <desc id="desc">Blue closed door with a closed padlock and green online indicator.</desc>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+
+    <rect x="44" y="38" width="118" height="170" rx="8" stroke="#1976D2" stroke-width="10"/>
+    <rect x="55" y="49" width="96" height="148" rx="4" stroke="#1976D2" stroke-width="4"/>
+    <circle cx="139" cy="127" r="6" fill="#1976D2" stroke="none"/>
+    <path d="M79 135 V121 Q79 97 103 97 Q127 97 127 121 V135" stroke="#1976D2" stroke-width="10"/>
+    <rect x="69" y="133" width="68" height="60" rx="9" fill="#1976D2" stroke="#1976D2" stroke-width="4"/>
+    <circle cx="103" cy="159" r="7" fill="#FFFFFF" stroke="none"/>
+    <path d="M103 166 V178" stroke="#FFFFFF" stroke-width="6"/>
+    <path d="M159 50 Q185 30 211 50" stroke="#4CAF50" stroke-width="10"/>
+    <path d="M169 64 Q185 52 201 64" stroke="#4CAF50" stroke-width="10"/>
+    <circle cx="185" cy="80" r="5" fill="#4CAF50" stroke="none"/>
+  </g>
+</svg>

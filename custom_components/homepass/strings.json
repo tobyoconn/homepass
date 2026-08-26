@@ -1,0 +1,482 @@
+{
+  "config": {
+    "error": {
+      "invalid_instance_name": "Enter a non-empty instance name."
+    },
+    "step": {
+      "user": {
+        "data": {
+          "instance_name": "Instance name"
+        },
+        "data_description": {
+          "instance_name": "A name used to identify this HomePASS installation."
+        },
+        "description": "Create the local HomePASS access-control registry.",
+        "title": "Set up HomePASS"
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_nfc_public_origin": "Enter a bare HTTPS origin without a path, query, credentials, or fragment.",
+      "invalid_nuki_lock_entity": "Select the Nuki lock entity provided by Home Assistant Matter.",
+      "invalid_nuki_security_pin": "Enter the six-digit Security PIN from the Nuki lock settings.",
+      "nuki_not_discovered": "No connectable Nuki lock was found at that address. Check the Bluetooth adapter and move it closer to the lock.",
+      "nuki_authorization_delete_failed": "HomePASS could not delete one of the selected Nuki PINs. Earlier selected entries may already have been removed; reopen the options to review the current list.",
+      "nuki_authorization_delete_unconfirmed": "Nuki accepted the deletion request, but HomePASS could not yet confirm it. Reopen the options and check the remaining PINs before trying again.",
+      "nuki_authorization_scan_failed": "HomePASS paired successfully but could not read the existing Nuki keypad PIN list. Keep the lock within Bluetooth range and try again.",
+      "nuki_authorization_selection_invalid": "The Nuki PIN list changed while it was open. Return to the previous step and review the current list.",
+      "nuki_pairing_authorization_full": "The Nuki lock has no free app authorization slots. Remove an obsolete app authorization in the Nuki app, then try again.",
+      "nuki_pairing_bad_pin": "The Nuki lock rejected its Security PIN. Enter the six-digit Security PIN from the Nuki lock settings, not a keypad access PIN.",
+      "nuki_pairing_connection_failed": "HomePASS found the Nuki lock but could not open the Bluetooth connection. Close the Nuki app near the lock, wait a few seconds, then try again.",
+      "nuki_pairing_failed": "HomePASS could not pair with the Nuki lock. Put the lock in pairing mode by holding its button for about six seconds, then try again.",
+      "nuki_pairing_not_enabled": "The Nuki lock is reachable but is not in pairing mode. Hold its button for about six seconds until the light stays on, then submit again while the light is still on.",
+      "nuki_pairing_protocol_failed": "The Nuki lock responded, but the secure pairing exchange was rejected. Restart the lock, confirm its firmware is current, then put it in pairing mode and try again.",
+      "nuki_pairing_timeout": "HomePASS connected to the Nuki lock but it did not complete pairing in time. Keep the Nuki app closed, put the lock in pairing mode, and try again.",
+      "nuki_vault_unavailable": "The encrypted HomePASS vault is unavailable, so pairing was not attempted. Check the HomePASS integration logs and try again."
+    },
+    "step": {
+      "init": {
+        "data": {
+          "nfc_public_origin": "NFC public origin",
+          "nuki_enabled": "Manage the Nuki keypad locally",
+          "nuki_lock_entity_id": "Nuki Matter lock",
+          "nuki_ble_address": "Nearby Nuki lock",
+          "nuki_security_pin": "Nuki Security PIN"
+        },
+        "data_description": {
+          "nfc_public_origin": "The fixed Nabu Casa HTTPS origin used for NFC taps and passkeys. Leave empty to keep NFC disabled.",
+          "nuki_enabled": "Home Assistant Matter keeps local lock control. HomePASS uses local Bluetooth for keypad PINs, schedules, and the audit log; no Nuki Web account is needed.",
+          "nuki_lock_entity_id": "The lock entity already provided locally by Home Assistant Matter.",
+          "nuki_ble_address": "The Nuki must be visible through a connectable Home Assistant Bluetooth adapter. Put it in pairing mode before saving a new pairing.",
+          "nuki_security_pin": "The six-digit PIN in the Nuki lock settings. It is encrypted in the HomePASS vault. Leave blank to keep an existing pairing."
+        },
+        "description": "Configure optional NFC and direct local Nuki access. For a first Nuki pairing, keep the lock nearby, hold its button for about six seconds, and enter its six-digit Security PIN. {diagnostic}",
+        "title": "Configure HomePASS providers"
+      },
+      "nuki_existing_pins": {
+        "data": {
+          "nuki_delete_all_authorizations": "Delete every existing PIN",
+          "nuki_delete_authorizations": "Existing PINs to delete"
+        },
+        "data_description": {
+          "nuki_delete_all_authorizations": "First-time pairing only. Permanently removes every existing PIN listed below before HomePASS starts managing the remaining capacity. Leave off to keep them all.",
+          "nuki_delete_authorizations": "Leave every PIN unselected to keep it. Select only PINs that should be permanently removed from the Nuki keypad. HomePASS never displays the PIN digits."
+        },
+        "description": "HomePASS found existing keypad PINs that it does not manage. They are kept by default and continue occupying Nuki capacity. Delete only entries you recognize as obsolete; HomePASS will use the capacity that remains.",
+        "title": "Review existing Nuki PINs"
+      },
+      "nuki_confirm_delete": {
+        "description": "Are you sure you want to permanently delete {pins}? This cannot be undone. Select Submit to delete it permanently, or close this window to keep it.",
+        "title": "Permanently delete the selected Nuki PIN?"
+      }
+    }
+  },
+  "services": {
+    "get_about": {
+      "name": "Get About information",
+      "description": "Returns presentation-safe HomePASS release and installation identity."
+    },
+    "get_property_settings": {
+      "name": "Get Property Settings",
+      "description": "Returns the homeowner-facing identity for this HomePASS installation."
+    },
+    "save_property_settings": {
+      "name": "Save Property Settings",
+      "description": "Validates and saves the homeowner-facing property identity.",
+      "fields": {
+        "settings": {
+          "name": "Settings",
+          "description": "Property Settings to save."
+        }
+      }
+    },
+    "create_person": {
+      "description": "Creates a User in HomePASS.",
+      "fields": {
+        "display_name": {
+          "description": "The name used to identify the User.",
+          "name": "Display name"
+        },
+        "description": {
+          "description": "Optional informational description with no authorization effect.",
+          "name": "Description"
+        },
+        "enabled": {
+          "description": "Whether the User is enabled.",
+          "name": "Enabled"
+        },
+        "notes": {
+          "description": "Optional administrative notes. Do not place credentials here.",
+          "name": "Notes"
+        }
+      },
+      "name": "Create User"
+    },
+    "delete_person": {
+      "description": "Deletes an existing User from HomePASS.",
+      "fields": {
+        "person_id": {
+          "description": "The stable HomePASS UUID of the User.",
+          "name": "User ID"
+        }
+      },
+      "name": "Delete User"
+    },
+    "get_person": {
+      "description": "Returns one User from HomePASS.",
+      "fields": {
+        "person_id": {
+          "description": "The stable HomePASS UUID of the User.",
+          "name": "User ID"
+        }
+      },
+      "name": "Get User"
+    },
+    "create_schedule": {
+      "description": "Creates a reusable schedule in HomePASS.",
+      "fields": {
+        "name": {"description": "The unique schedule name.", "name": "Name"},
+        "time_zone": {"description": "The IANA timezone for weekly rules.", "name": "Timezone"},
+        "enabled": {"description": "Whether the schedule may authorize access.", "name": "Enabled"},
+        "valid_from": {"description": "Optional inclusive validity start.", "name": "Valid from"},
+        "valid_until": {"description": "Optional exclusive validity end.", "name": "Valid until"},
+        "weekly_rules": {"description": "Weekly rule objects containing day_of_week, start_time, and end_time.", "name": "Weekly rules"}
+      },
+      "name": "Create schedule"
+    },
+    "update_schedule": {
+      "description": "Updates an existing HomePASS schedule.",
+      "fields": {
+        "schedule_id": {"description": "The stable HomePASS UUID of the schedule.", "name": "Schedule ID"},
+        "name": {"description": "The new unique schedule name.", "name": "Name"},
+        "time_zone": {"description": "The IANA timezone for weekly rules.", "name": "Timezone"},
+        "enabled": {"description": "Whether the schedule may authorize access.", "name": "Enabled"},
+        "valid_from": {"description": "Optional inclusive validity start.", "name": "Valid from"},
+        "valid_until": {"description": "Optional exclusive validity end.", "name": "Valid until"},
+        "weekly_rules": {"description": "Replacement weekly rule objects.", "name": "Weekly rules"}
+      },
+      "name": "Update schedule"
+    },
+    "delete_schedule": {
+      "description": "Deletes an unprotected HomePASS schedule.",
+      "fields": {"schedule_id": {"description": "The stable HomePASS UUID of the schedule.", "name": "Schedule ID"}},
+      "name": "Delete schedule"
+    },
+    "get_schedule": {
+      "description": "Returns one schedule from HomePASS.",
+      "fields": {"schedule_id": {"description": "The stable HomePASS UUID of the schedule.", "name": "Schedule ID"}},
+      "name": "Get schedule"
+    },
+    "list_schedules": {
+      "description": "Returns all schedules from HomePASS.",
+      "name": "List schedules"
+    },
+    "get_person_schedule": {
+      "description": "Returns one User's effective schedule and editor concurrency state.",
+      "fields": {"person_id": {"description": "The HomePASS UUID of the User.", "name": "User ID"}},
+      "name": "Get User schedule"
+    },
+    "save_person_schedule": {
+      "description": "Atomically applies a schedule to all of a User's doors or a selected subset.",
+      "fields": {
+        "person_id": {"description": "The HomePASS UUID of the User.", "name": "User ID"},
+        "time_zone": {"description": "The Home Assistant IANA timezone for local values.", "name": "Timezone"},
+        "valid_from": {"description": "The local validity start or null.", "name": "Valid from"},
+        "valid_until": {"description": "The local validity end or null.", "name": "Valid until"},
+        "weekly_rules": {"description": "The complete replacement weekly rule collection.", "name": "Weekly rules"},
+        "expected_person_updated_at": {"description": "The User editor concurrency timestamp.", "name": "Expected User update"},
+        "schedule_id": {"description": "The current Schedule concurrency identifier.", "name": "Schedule ID"},
+        "expected_schedule_revision": {"description": "The current Schedule revision.", "name": "Expected revision"},
+        "enabled": {"description": "Whether the schedule may authorize access.", "name": "Enabled"},
+        "access_point_ids": {"description": "The optional assigned-door subset for this schedule group.", "name": "Door IDs"}
+      },
+      "name": "Save User schedule"
+    },
+    "give_access": {
+      "description": "Programs a PIN for a HomePASS User and access point and retains it in the encrypted credential vault.",
+      "fields": {
+        "access_point_id": {
+          "description": "The HomePASS UUID of the selected access point.",
+          "name": "Access point ID"
+        },
+        "person_id": {
+          "description": "The HomePASS UUID of the User receiving access.",
+          "name": "User ID"
+        },
+        "pin": {
+          "description": "A 4-to-10-digit PIN to provision and retain securely.",
+          "name": "PIN"
+        }
+      },
+      "name": "Give access"
+    },
+    "update_access": {
+      "description": "Updates the access points assigned to a HomePASS User.",
+      "fields": {
+        "access_point_ids": {
+          "description": "The selected HomePASS access point UUIDs.",
+          "name": "Access point IDs"
+        },
+        "person_id": {
+          "description": "The stable HomePASS UUID of the User.",
+          "name": "User ID"
+        }
+      },
+      "name": "Update access"
+    },
+    "list_access_points": {
+      "description": "Returns the access points available for HomePASS workflows.",
+      "name": "List access points"
+    },
+    "update_access_point": {
+      "description": "Updates the friendly HomePASS name used for a managed door and its NFC access pages.",
+      "fields": {
+        "access_point_id": {
+          "description": "The stable HomePASS UUID of the Door.",
+          "name": "Door ID"
+        },
+        "display_name": {
+          "description": "The friendly Door name shown throughout HomePASS.",
+          "name": "Door name"
+        }
+      },
+      "name": "Rename Door"
+    },
+    "list_people": {
+      "description": "Returns all Users from HomePASS.",
+      "name": "List Users"
+    },
+    "get_user_setup_options": {
+      "description": "Returns durable doors and schedules for guided User setup.",
+      "name": "Get User setup options"
+    },
+    "create_user": {
+      "description": "Creates a User and securely orchestrates selected door access.",
+      "name": "Create User"
+    },
+    "assign_user_access": {
+      "description": "Assigns a missing PIN and adds selected doors without replacing existing access.",
+      "name": "Complete User access setup"
+    },
+    "ping": {
+      "description": "Logs a message to confirm that HomePASS is loaded.",
+      "name": "Ping"
+    },
+    "get_notification_preferences": {
+      "description": "Returns notification preferences and discovered Companion App devices.",
+      "name": "Get notification preferences"
+    },
+    "save_notification_preferences": {
+      "description": "Validates and saves notification preferences without sending notifications.",
+      "fields": {
+        "preferences": {
+          "description": "The complete notification preference selection.",
+          "name": "Preferences"
+        }
+      },
+      "name": "Save notification preferences"
+    },
+    "test_zwave_delete_user": {
+      "description": "Deletes one explicitly selected Z-Wave user created during synchronization testing.",
+      "fields": {
+        "lock_entity_id": {
+          "description": "The existing Z-Wave lock entity to update.",
+          "name": "Lock entity"
+        },
+        "user_id": {
+          "description": "The exact Z-Wave user identifier to delete.",
+          "name": "User ID"
+        }
+      },
+      "name": "Test Z-Wave user cleanup"
+    },
+    "test_vault_crypto_runtime": {
+      "description": "Checks AES-256-GCM runtime compatibility in memory without storing or returning cryptographic material.",
+      "name": "Test credential-vault cryptography runtime"
+    },
+    "test_zwave_pin_sync": {
+      "description": "Creates and verifies a temporary named Z-Wave lock user and PIN without storing the PIN.",
+      "fields": {
+        "display_name": {
+          "description": "The name assigned to the temporary Z-Wave user.",
+          "name": "Display name"
+        },
+        "lock_entity_id": {
+          "description": "The existing Z-Wave lock entity to update.",
+          "name": "Lock entity"
+        },
+        "pin": {
+          "description": "An ephemeral 4-to-8-digit PIN used only for this action invocation.",
+          "name": "PIN"
+        }
+      },
+      "name": "Test Z-Wave PIN synchronization"
+    },
+    "create_nfc_enrollment": {
+      "description": "Creates an expiring, single-use passkey enrollment URL for one HomePASS User.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"},
+        "expires_in_hours": {"description": "How long the enrollment link remains valid.", "name": "Expires in hours"}
+      },
+      "name": "Create NFC passkey enrollment"
+    },
+    "get_nuki_fingerprint_status": {
+      "description": "Returns non-biometric Nuki fingerprint enrollment status for one HomePASS User.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"}
+      },
+      "name": "Get Nuki fingerprint status"
+    },
+    "get_nuki_storage_status": {
+      "description": "Returns a read-only, secret-free summary of Nuki PIN storage and HomePASS-linked fingerprint status.",
+      "name": "Get Nuki storage status"
+    },
+    "start_nuki_fingerprint_enrollment": {
+      "description": "Links a synchronized Nuki PIN authorization before fingerprint scanning in the Nuki app.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"},
+        "access_point_id": {"description": "The stable HomePASS UUID of the Nuki Door.", "name": "Door ID"}
+      },
+      "name": "Start Nuki fingerprint enrollment"
+    },
+    "complete_nuki_fingerprint_enrollment": {
+      "description": "Records that the Nuki app scan step is complete while awaiting a matching fingerprint event.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"},
+        "access_point_id": {"description": "The stable HomePASS UUID of the Nuki Door.", "name": "Door ID"}
+      },
+      "name": "Complete Nuki app fingerprint step"
+    },
+    "get_nfc_enrollment_status": {
+      "description": "Returns non-secret NFC passkey and Door assignment status for one HomePASS User.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"}
+      },
+      "name": "Get NFC enrollment status"
+    },
+    "list_nfc_enrollment_statuses": {
+      "description": "Returns non-secret NFC passkey and Door assignment summaries for all HomePASS Users.",
+      "name": "List NFC enrollment statuses"
+    },
+    "revoke_nfc_enrollment": {
+      "description": "Revokes all NFC passkeys, pending enrollment links, and NFC Door assignments for one HomePASS User.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"}
+      },
+      "name": "Revoke NFC enrollment"
+    },
+    "create_nfc_test_tag": {
+      "description": "Creates a revocable static Nabu Casa URL for temporary NTAG216 testing.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"},
+        "expires_in_hours": {"description": "How long the test-tag URL remains valid.", "name": "Expires in hours"}
+      },
+      "name": "Create NTAG216 test tag"
+    },
+    "get_nfc_test_tag_status": {
+      "description": "Returns whether a non-expired NTAG216 test URL is active for one HomePASS Door.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"}
+      },
+      "name": "Get NTAG216 test-tag status"
+    },
+    "revoke_nfc_test_tag": {
+      "description": "Immediately revokes every static NTAG216 test URL for one HomePASS Door.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"}
+      },
+      "name": "Revoke NTAG216 test tag"
+    },
+    "prepare_nfc_tag": {
+      "description": "Creates the secure URL and one-time programming values for an NTAG 424 DNA assigned to a managed door.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the NFC-capable door.", "name": "Door ID"},
+        "uid_hex": {"description": "The 7-byte NTAG 424 DNA UID as hexadecimal.", "name": "Tag UID"},
+        "meta_read_key": {"description": "Optional 16-byte hexadecimal metadata key; generated when omitted.", "name": "Metadata read key"},
+        "file_read_key": {"description": "Optional 16-byte hexadecimal file key; generated when omitted.", "name": "File read key"}
+      },
+      "name": "Prepare NFC door tag"
+    },
+    "prepare_nfc_tag_protection": {
+      "description": "Creates a recoverable rewrite-protection package for an existing HomePASS NTAG424.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"},
+        "public_id": {"description": "The public HomePASS identifier of the tag.", "name": "Tag ID"}
+      },
+      "name": "Prepare NFC tag rewrite protection"
+    },
+    "confirm_nfc_tag_protection": {
+      "description": "Records that GoToTags verified HomePASS rewrite protection.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"},
+        "public_id": {"description": "The public HomePASS identifier of the tag.", "name": "Tag ID"}
+      },
+      "name": "Confirm NFC tag rewrite protection"
+    },
+    "update_nfc_access": {
+      "description": "Replaces the NFC-capable doors assigned to one HomePASS User without creating PIN credentials.",
+      "fields": {
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"},
+        "access_point_ids": {"description": "The complete replacement list of NFC-capable Door UUIDs.", "name": "Door IDs"}
+      },
+      "name": "Update NFC door access"
+    },
+    "list_nfc_tags": {
+      "description": "Lists the non-secret identifiers and status of NFC tags registered to a Door.",
+      "fields": {"access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"}},
+      "name": "List NFC door tags"
+    },
+    "revoke_nfc_tag": {
+      "description": "Temporarily disables one NFC tag without affecting other tags, users, or the Door.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"},
+        "public_id": {"description": "The public HomePASS identifier of the tag to revoke.", "name": "Tag ID"}
+      },
+      "name": "Temporarily disable NFC door tag"
+    },
+    "reinstate_nfc_tag": {
+      "description": "Re-enables one previously disabled NFC tag.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"},
+        "public_id": {"description": "The public HomePASS identifier of the tag to reinstate.", "name": "Tag ID"}
+      },
+      "name": "Reinstate NFC door tag"
+    },
+    "delete_nfc_tag": {
+      "description": "Permanently removes one NFC tag registration from HomePASS.",
+      "fields": {
+        "access_point_id": {"description": "The stable HomePASS UUID of the Door.", "name": "Door ID"},
+        "public_id": {"description": "The public HomePASS identifier of the tag to delete.", "name": "Tag ID"}
+      },
+      "name": "Delete NFC door tag"
+    },
+    "update_person": {
+      "description": "Updates an existing User in HomePASS.",
+      "fields": {
+        "display_name": {
+          "description": "The new name used to identify the User.",
+          "name": "Display name"
+        },
+        "description": {
+          "description": "Optional informational description with no authorization effect.",
+          "name": "Description"
+        },
+        "enabled": {
+          "description": "Whether the User is enabled.",
+          "name": "Enabled"
+        },
+        "notes": {
+          "description": "New administrative notes. Do not place credentials here.",
+          "name": "Notes"
+        },
+        "person_id": {
+          "description": "The stable HomePASS UUID of the User.",
+          "name": "User ID"
+        }
+      },
+      "name": "Update User"
+    }
+  },
+  "title": "HomePASS"
+}

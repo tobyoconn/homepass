@@ -1,0 +1,358 @@
+:root {
+  color-scheme: light;
+  --homepass-blue: #2450e6;
+  --homepass-blue-deep: #1538a6;
+  --homepass-green: #55a44e;
+  --homepass-ink: #172036;
+  --homepass-muted: #637089;
+  --homepass-line: #d9e0ec;
+  --homepass-surface: #ffffff;
+  --homepass-soft-blue: #eef3ff;
+  --homepass-soft-green: #edf8ec;
+  --homepass-error: #b42318;
+  --homepass-warning: #a66300;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html {
+  min-height: 100%;
+  background: #eaf0fb;
+}
+
+body {
+  min-height: 100svh;
+  margin: 0;
+  padding: max(24px, env(safe-area-inset-top)) 20px
+    max(24px, env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(85, 164, 78, 0.2), transparent 28rem),
+    radial-gradient(circle at 92% 0%, rgba(36, 80, 230, 0.24), transparent 32rem),
+    linear-gradient(145deg, #f6f9ff 0%, #e8eefb 58%, #edf7ec 100%);
+  color: var(--homepass-ink);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.page-shell {
+  display: grid;
+  min-height: calc(100svh - max(48px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  place-items: center;
+}
+
+.access-card {
+  position: relative;
+  display: grid;
+  width: min(100%, 470px);
+  gap: 26px;
+  overflow: hidden;
+  padding: 28px;
+  border: 1px solid rgba(36, 80, 230, 0.13);
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--homepass-surface) 96%, transparent);
+  box-shadow:
+    0 26px 80px rgba(23, 32, 54, 0.14),
+    0 5px 18px rgba(36, 80, 230, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.access-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: linear-gradient(90deg, var(--homepass-blue) 0 66%, var(--homepass-green) 66%);
+  content: "";
+}
+
+.brand-header {
+  display: grid;
+  gap: 17px;
+}
+
+.logo {
+  display: block;
+  width: 320px;
+  max-width: 92%;
+  height: auto;
+  margin: 2px auto 0;
+}
+
+.property-context {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin: 0;
+  text-align: center;
+}
+
+.property-label,
+.eyebrow {
+  color: var(--homepass-blue);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.property-name {
+  color: var(--homepass-muted);
+  font-size: 15px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.door-hero {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.door-symbol {
+  position: relative;
+  display: grid;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 4px;
+  place-items: center;
+  border: 1px solid rgba(36, 80, 230, 0.12);
+  border-radius: 28px;
+  background: linear-gradient(145deg, #f3f6ff, #e6edff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.door-symbol::after {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--homepass-surface);
+  border-radius: 50%;
+  background: var(--homepass-green);
+  content: "";
+}
+
+.door-symbol img {
+  display: block;
+  width: 66px;
+  height: 66px;
+}
+
+.eyebrow {
+  margin: 2px 0 0;
+}
+
+.test-notice {
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #fff4dd;
+  color: var(--homepass-warning);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.test .eyebrow {
+  color: var(--homepass-warning);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 8vw, 38px);
+  font-weight: 750;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.message {
+  max-width: 360px;
+  margin: 0;
+  color: var(--homepass-muted);
+  font-size: 16px;
+}
+
+.access-action {
+  display: grid;
+  gap: 12px;
+}
+
+button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 58px;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--homepass-blue), var(--homepass-blue-deep));
+  box-shadow: 0 10px 24px rgba(36, 80, 230, 0.23);
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 750;
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+button::before {
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  background: url("/homepass_nfc_static/passkey.svg?version=1.8.0") center / contain no-repeat;
+  content: "";
+}
+
+button[data-platform="apple"]::before {
+  background-image: url("/homepass_nfc_static/face-id.svg?version=1.8.0");
+}
+
+button[data-platform="android"]::before {
+  background-image: url("/homepass_nfc_static/android-biometric.svg?version=1.8.0");
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 30px rgba(36, 80, 230, 0.28);
+}
+
+button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--homepass-blue) 35%, white);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.status {
+  min-height: 24px;
+  color: var(--homepass-muted);
+  font-size: 14px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.completion-note {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid rgba(85, 164, 78, 0.2);
+  border-radius: 14px;
+  background: var(--homepass-soft-green);
+  color: #397c35;
+  font-size: 14px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.authorization-notice {
+  margin: 4px auto 0;
+  padding: 11px 14px;
+  border: 1px solid rgba(36, 80, 230, 0.14);
+  border-radius: 14px;
+  background: rgba(36, 80, 230, 0.055);
+  color: var(--homepass-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.trust-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding-top: 18px;
+  border-top: 1px solid var(--homepass-line);
+  color: var(--homepass-muted);
+  font-size: 13px;
+}
+
+.trust-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--homepass-soft-green);
+  color: var(--homepass-green);
+  font-weight: 900;
+}
+
+.trust-footer p {
+  margin: 0;
+}
+
+.ok .door-symbol {
+  border-color: rgba(85, 164, 78, 0.22);
+  background: var(--homepass-soft-green);
+}
+
+.ok .eyebrow,
+.ok .status {
+  color: var(--homepass-green);
+}
+
+.error .door-symbol {
+  border-color: rgba(180, 35, 24, 0.18);
+  background: #fff0ef;
+}
+
+.error .eyebrow,
+.error .status {
+  color: var(--homepass-error);
+}
+
+.error .door-symbol::after {
+  background: var(--homepass-error);
+}
+
+.expired .door-symbol {
+  border-color: rgba(166, 99, 0, 0.2);
+  background: #fff6e7;
+}
+
+.expired .door-symbol img {
+  opacity: 0.72;
+}
+
+.expired .eyebrow,
+.expired .status {
+  color: var(--homepass-warning);
+}
+
+.expired .door-symbol::after {
+  background: var(--homepass-warning);
+}
+
+@media (max-width: 520px) {
+  body {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .access-card {
+    gap: 22px;
+    padding: 25px 20px;
+    border-radius: 25px;
+  }
+
+  .logo {
+    width: 282px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}

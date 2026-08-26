@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Offline or unknown</title>
+  <desc id="desc">Blue door with a question mark and gray offline indicator.</desc>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+
+    <rect x="44" y="38" width="118" height="170" rx="8" stroke="#1976D2" stroke-width="10"/>
+    <rect x="55" y="49" width="96" height="148" rx="4" stroke="#1976D2" stroke-width="4"/>
+    <circle cx="139" cy="127" r="6" fill="#1976D2" stroke="none"/>
+    <text x="102" y="154" fill="#1976D2" stroke="none" font-family="Arial, Helvetica, sans-serif"
+          font-size="88" font-weight="700" text-anchor="middle">?</text>
+    <path d="M159 50 Q185 30 211 50" stroke="#9E9E9E" stroke-width="10"/>
+    <path d="M169 64 Q185 52 201 64" stroke="#9E9E9E" stroke-width="10"/>
+    <circle cx="185" cy="80" r="5" fill="#9E9E9E" stroke="none"/>
+    <path d="M167 38 L205 76" stroke="#9E9E9E" stroke-width="8"/>
+  </g>
+</svg>

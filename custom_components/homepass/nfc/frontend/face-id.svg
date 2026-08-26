@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Face ID">
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.25">
+    <path d="M17 6h-5a6 6 0 0 0-6 6v5M31 6h5a6 6 0 0 1 6 6v5M42 31v5a6 6 0 0 1-6 6h-5M17 42h-5a6 6 0 0 1-6-6v-5"/>
+    <path d="M24 17v8.5c0 2.4-1.5 3.5-3.5 3.5M15.5 18.5v2M32.5 18.5v2M16 33c2.2 2.1 4.8 3 8 3s5.8-.9 8-3"/>
+  </g>
+</svg>
