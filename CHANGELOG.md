@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.17.5] - 2026-08-27
+
+### Fixed
+
+- Restored startup for installations whose legacy notification-preference record cannot
+  be read by the current model.
+- Replaced only the invalid active notification preferences with safe defaults while
+  retaining the original record in a private recovery backup.
+
+### Security
+
+- Kept all Doors, Users, credentials, access grants, schedules, NFC data and vault data
+  outside the recovery change, and prevented recovered preference values from appearing
+  in logs.
+
 ## [1.17.4] - 2026-08-26
 
 ### Added

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import math
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -34,6 +35,10 @@ _TRANSACTION_ACTIVE: ContextVar[bool] = ContextVar(
 
 _MANAGED_ACCESS_POINTS_SETTING = "managed_access_points"
 _ACCESS_POINT_NAME_FALLBACKS_SETTING = "access_point_name_fallbacks"
+_NOTIFICATION_PREFERENCES_RECOVERY_BACKUP_SETTING = (
+    "notification_preferences_recovery_backup"
+)
+_LOGGER = logging.getLogger(__name__)
 _LEGACY_ACCESS_POINT_ID = "00000000-0000-4000-8000-000000000001"
 _LEGACY_ACCESS_POINT_DISPLAY_NAME = "Lock"
 _MIGRATED_ACCESS_POINT_DISPLAY_NAME = "Lock"
@@ -564,9 +569,21 @@ def _validate_domain_snapshot(raw: object) -> HomePassStorageData:
                 raise ValueError("Stored lifecycle operation references a missing Access Point")
         raw_notification_preferences = snapshot["data"]["settings"].get("notification_preferences")
         if raw_notification_preferences is not None:
-            notification_preferences = NotificationPreferences.migrate_dict(
-                raw_notification_preferences
-            )
+            try:
+                notification_preferences = NotificationPreferences.migrate_dict(
+                    raw_notification_preferences
+                )
+            except (TypeError, ValueError):
+                settings = snapshot["data"]["settings"]
+                settings.setdefault(
+                    _NOTIFICATION_PREFERENCES_RECOVERY_BACKUP_SETTING,
+                    deepcopy(raw_notification_preferences),
+                )
+                notification_preferences = NotificationPreferences.defaults()
+                _LOGGER.warning(
+                    "Recovered invalid HomePASS notification preferences; "
+                    "access-control records were not changed"
+                )
             snapshot["data"]["settings"]["notification_preferences"] = cast(
                 JsonValue,
                 notification_preferences.to_dict(),
