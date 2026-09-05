@@ -1,6 +1,6 @@
 # Home Assistant custom-integration test environment.
 pytest-homeassistant-custom-component==0.13.357
-zwave-js-server-python==0.73.0
+zwave-js-server-python==0.73.1
 aiousbwatcher==1.1.2
 serialx==1.8.2
 home-assistant-frontend==20260729.7
