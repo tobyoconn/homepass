@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.18.1] - 2026-09-05
+
+- Corrected the internal version used by About and NFC asset cache refresh.
+- Added regression coverage and a release gate requiring the internal version,
+  integration manifest, project metadata and release tag to agree.
+- Includes the battery-health and Open Door changes documented below. Use this version
+  instead of the superseded 1.18.0 candidate.
+
 ## [1.18.0] - 2026-09-05
 
 - Added upright dashboard battery indicators for locks, door sensors and accessories, preserving existing door artwork and status markers.
