@@ -37,9 +37,7 @@ class NukiLocalTransport(Protocol):
     async def add_keypad_code(self, request: AuthorizationRequest) -> str:
         """Create one code and return the lock-assigned code identifier."""
 
-    async def update_keypad_code(
-        self, external_id: str, request: AuthorizationRequest
-    ) -> None:
+    async def update_keypad_code(self, external_id: str, request: AuthorizationRequest) -> None:
         """Update one existing code."""
 
     async def remove_keypad_code(self, external_id: str) -> None:
@@ -72,9 +70,7 @@ class NukiLocalAuthorizationProvider(AuthorizationProvider):
     async def create_authorization(self, request: AuthorizationRequest) -> AuthorizationMutation:
         self._validate_request(request)
         if not request.enabled:
-            raise ValueError(
-                "Nuki cannot safely create a disabled keypad authorization"
-            )
+            raise ValueError("Nuki cannot safely create a disabled keypad authorization")
         try:
             external_id = await self._transport.add_keypad_code(request)
         except ProviderCommunicationError as err:
@@ -217,11 +213,7 @@ class NukiLocalAuthorizationProvider(AuthorizationProvider):
 
     @staticmethod
     def _validate_external_id(external_id: str) -> None:
-        if (
-            not isinstance(external_id, str)
-            or not external_id.isdecimal()
-            or int(external_id) < 1
-        ):
+        if not isinstance(external_id, str) or not external_id.isdecimal() or int(external_id) < 1:
             raise ValueError("Nuki keypad code identifier must be a positive number")
 
     @staticmethod

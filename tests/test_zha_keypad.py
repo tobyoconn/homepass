@@ -68,9 +68,7 @@ def test_other_observed_arm_modes_remain_parseable_but_policy_disabled() -> None
 
 def test_internal_state_event_and_malformed_pins_are_ignored() -> None:
     internal = dict(_event(0))
-    internal["command"] = (
-        "00:11:22:33:44:55:66:77:44:0x0501_CLIENT_zha_armed_state_changed"
-    )
+    internal["command"] = "00:11:22:33:44:55:66:77:44:0x0501_CLIENT_zha_armed_state_changed"
 
     assert parse_zha_keypad_command(internal) is None
     assert parse_zha_keypad_command(_event(0, "12ab")) is None

@@ -68,7 +68,9 @@ def test_gototags_operation_is_private_ready_and_self_contained() -> None:
 def test_new_tags_offer_recoverable_or_permanent_rewrite_protection() -> None:
     assert "Leave it re-writable with the HomePASS administrator key (recommended)" in _SOURCE
     assert "Lock it as permanently written" in _SOURCE
-    assert "This gives the strongest protection against alteration, but it is irreversible" in _SOURCE
+    assert (
+        "This gives the strongest protection against alteration, but it is irreversible" in _SOURCE
+    )
     assert '"chip.ntag424.newKeys.key0": result.admin_key' in _SOURCE
     assert '"chip.ntag424.currentKeys.key0": result.current_admin_key || factoryKey' in _SOURCE
     assert "currentFileKey = existingTag ? result.file_read_key : factoryKey" in _SOURCE

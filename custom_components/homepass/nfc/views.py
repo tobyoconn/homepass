@@ -36,10 +36,13 @@ class _Runtime:
 
 
 def _headers() -> dict[str, str]:
-    return {"Cache-Control": "no-store, max-age=0",
+    return {
+        "Cache-Control": "no-store, max-age=0",
         "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-        "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
-        "X-Frame-Options": "DENY"}
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+    }
 
 
 def _page(config: dict[str, Any]) -> web.Response:
@@ -55,9 +58,7 @@ def _page(config: dict[str, Any]) -> web.Response:
         if test_mode
         else "Secure NFC access"
     )
-    test_notice = (
-        '<p class="test-notice">Temporary NTAG216 test tag</p>' if test_mode else ""
-    )
+    test_notice = '<p class="test-notice">Temporary NTAG216 test tag</p>' if test_mode else ""
     trust_copy = (
         "Protected by HomePASS, your current Door policy, and your device passkey."
         if test_mode
@@ -120,13 +121,18 @@ async def _body(request: web.Request) -> dict[str, Any]:
 
 class _NfcView(HomeAssistantView):
     requires_auth = False
+
     def __init__(self, hass: HomeAssistant) -> None:
         self._hass = hass
+
     def runtime(self, request: web.Request) -> _Runtime:
         runtime = self._hass.data.get(_RUNTIME_KEY)
         if not isinstance(runtime, _Runtime):
             raise web.HTTPServiceUnavailable(text="HomePASS NFC is unavailable")
-        if request.method == "POST" and request.headers.get("Origin") != runtime.webauthn.public_origin:
+        if (
+            request.method == "POST"
+            and request.headers.get("Origin") != runtime.webauthn.public_origin
+        ):
             raise web.HTTPForbidden(text="Request origin is invalid")
         return runtime
 
@@ -134,17 +140,26 @@ class _NfcView(HomeAssistantView):
 class NfcTapView(_NfcView):
     url = "/api/homepass/nfc/t/{public_id}"
     name = "api:homepass:nfc:tap"
+
     async def get(self, request: web.Request, public_id: str) -> web.Response:
         runtime = self.runtime(request)
         property_name = await _property_name(runtime)
         try:
             ready = await runtime.access.begin_tap(
-                public_id=public_id, encrypted_picc=request.query.get("e", ""),
-                mac=request.query.get("c", ""))
-            return _page({"mode": "unlock", "tapSession": ready.tap_session,
-                          "door": ready.door_name, "property": property_name,
-                          "action": ready.action,
-                          "expiresInMs": TAP_SESSION_TTL_SECONDS * 1000})
+                public_id=public_id,
+                encrypted_picc=request.query.get("e", ""),
+                mac=request.query.get("c", ""),
+            )
+            return _page(
+                {
+                    "mode": "unlock",
+                    "tapSession": ready.tap_session,
+                    "door": ready.door_name,
+                    "property": property_name,
+                    "action": ready.action,
+                    "expiresInMs": TAP_SESSION_TTL_SECONDS * 1000,
+                }
+            )
         except Exception:  # noqa: BLE001 - opaque public response
             _LOGGER.debug("An NFC tap failed cryptographic or capability validation")
             return _page({"mode": "unavailable", "property": property_name})
@@ -159,15 +174,17 @@ class NfcTestTapView(_NfcView):
         property_name = await _property_name(runtime)
         try:
             ready = await runtime.access.begin_test_tap(raw_token=token)
-            return _page({
-                "mode": "unlock",
-                "tapSession": ready.tap_session,
-                "door": ready.door_name,
-                "property": property_name,
-                "action": ready.action,
-                "testMode": True,
-                "expiresInMs": TAP_SESSION_TTL_SECONDS * 1000,
-            })
+            return _page(
+                {
+                    "mode": "unlock",
+                    "tapSession": ready.tap_session,
+                    "door": ready.door_name,
+                    "property": property_name,
+                    "action": ready.action,
+                    "testMode": True,
+                    "expiresInMs": TAP_SESSION_TTL_SECONDS * 1000,
+                }
+            )
         except Exception:  # noqa: BLE001 - opaque public response
             _LOGGER.debug("An NTAG216 test tap failed validation")
             return _page({"mode": "unavailable", "property": property_name})
@@ -176,20 +193,26 @@ class NfcTestTapView(_NfcView):
 class EnrollmentPageView(_NfcView):
     url = "/api/homepass/nfc/enroll/{token}"
     name = "api:homepass:nfc:enrollment_page"
+
     async def get(self, request: web.Request, token: str) -> web.Response:
         runtime = self.runtime(request)
-        return _page({"mode": "enroll", "inviteToken": token,
-                      "property": await _property_name(runtime)})
+        return _page(
+            {"mode": "enroll", "inviteToken": token, "property": await _property_name(runtime)}
+        )
 
 
 class RegistrationOptionsView(_NfcView):
     url = "/api/homepass/nfc/passkey/register/options"
     name = "api:homepass:nfc:registration_options"
+
     async def post(self, request: web.Request) -> web.Response:
         runtime, data = self.runtime(request), await _body(request)
         try:
-            return _json(await runtime.webauthn.begin_registration(
-                str(data["inviteToken"]), property_name=await _property_name(runtime)))
+            return _json(
+                await runtime.webauthn.begin_registration(
+                    str(data["inviteToken"]), property_name=await _property_name(runtime)
+                )
+            )
         except Exception:
             return _json({"error": "This enrollment link is invalid or expired."}, 403)
 
@@ -197,11 +220,13 @@ class RegistrationOptionsView(_NfcView):
 class RegistrationCompleteView(_NfcView):
     url = "/api/homepass/nfc/passkey/register/complete"
     name = "api:homepass:nfc:registration_complete"
+
     async def post(self, request: web.Request) -> web.Response:
         runtime, data = self.runtime(request), await _body(request)
         try:
             await runtime.webauthn.finish_registration(
-                str(data["ceremony"]), dict(data["credential"]))
+                str(data["ceremony"]), dict(data["credential"])
+            )
             return _json({"ok": True})
         except Exception:
             return _json({"error": "Passkey enrollment could not be verified."}, 403)
@@ -210,6 +235,7 @@ class RegistrationCompleteView(_NfcView):
 class AuthenticationOptionsView(_NfcView):
     url = "/api/homepass/nfc/passkey/authenticate/options"
     name = "api:homepass:nfc:authentication_options"
+
     async def post(self, request: web.Request) -> web.Response:
         runtime, data = self.runtime(request), await _body(request)
         try:
@@ -223,38 +249,58 @@ class AuthenticationOptionsView(_NfcView):
 class AuthenticationCompleteView(_NfcView):
     url = "/api/homepass/nfc/passkey/authenticate/complete"
     name = "api:homepass:nfc:authentication_complete"
+
     async def post(self, request: web.Request) -> web.Response:
         runtime, data = self.runtime(request), await _body(request)
         try:
             identity = await runtime.webauthn.finish_authentication(
-                str(data["ceremony"]), dict(data["credential"]))
+                str(data["ceremony"]), dict(data["credential"])
+            )
             result = await runtime.access.operate(
-                tap_session=identity.tap_session, person_id=identity.person_id)
-            return _json({"allowed": result.allowed, "door": result.door_name,
-                          "message": result.message,
-                          "action": result.action,
-                          "testMode": result.test_mode},
-                         200 if result.allowed else 403)
+                tap_session=identity.tap_session, person_id=identity.person_id
+            )
+            return _json(
+                {
+                    "allowed": result.allowed,
+                    "door": result.door_name,
+                    "message": result.message,
+                    "action": result.action,
+                    "testMode": result.test_mode,
+                },
+                200 if result.allowed else 403,
+            )
         except Exception:
             _LOGGER.debug("An NFC passkey access attempt failed")
-            return _json({"allowed": False,
-                "message": "Access could not be verified. Please tap again."}, 403)
+            return _json(
+                {"allowed": False, "message": "Access could not be verified. Please tap again."},
+                403,
+            )
 
 
-async def async_register_nfc_views(hass: HomeAssistant, access: NfcAccessService,
-                                   webauthn: HomePassWebAuthnService,
-                                   property_settings: PropertySettingsService) -> None:
+async def async_register_nfc_views(
+    hass: HomeAssistant,
+    access: NfcAccessService,
+    webauthn: HomePassWebAuthnService,
+    property_settings: PropertySettingsService,
+) -> None:
     hass.data[_RUNTIME_KEY] = _Runtime(access, webauthn, property_settings)
     if hass.data.get(_REGISTERED_KEY):
         return
     if not hass.data.get(_STATIC_REGISTERED_KEY):
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(_STATIC_PATH, str(_FRONTEND), False)])
+            [StaticPathConfig(_STATIC_PATH, str(_FRONTEND), False)]
+        )
         hass.data[_STATIC_REGISTERED_KEY] = True
     registered_names = hass.data.setdefault(_REGISTERED_VIEW_NAMES_KEY, set())
-    for view in (NfcTapView, NfcTestTapView, EnrollmentPageView, RegistrationOptionsView,
-                 RegistrationCompleteView, AuthenticationOptionsView,
-                 AuthenticationCompleteView):
+    for view in (
+        NfcTapView,
+        NfcTestTapView,
+        EnrollmentPageView,
+        RegistrationOptionsView,
+        RegistrationCompleteView,
+        AuthenticationOptionsView,
+        AuthenticationCompleteView,
+    ):
         if view.name in registered_names:
             continue
         hass.http.register_view(view(hass))

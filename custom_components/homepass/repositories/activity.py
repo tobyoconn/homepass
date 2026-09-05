@@ -119,7 +119,7 @@ class ActivityRepository:
         try:
             async with self._lock:
                 return await self._storage.async_transaction(mutator)
-        except (ActivityDuplicateConflictError, StorageError):
+        except ActivityDuplicateConflictError, StorageError:
             raise
         except Exception as err:
             raise StorageError("Unable to save Activity Event") from err

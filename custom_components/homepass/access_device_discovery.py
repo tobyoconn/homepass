@@ -72,9 +72,7 @@ class HomeAssistantAccessDeviceDiscovery:
             model = (device.model or "").strip()
             model_id = (getattr(device, "model_id", None) or "").strip()
             all_entities = tuple(
-                entry
-                for entry in entity_registry.entities.values()
-                if entry.device_id == device.id
+                entry for entry in entity_registry.entities.values() if entry.device_id == device.id
             )
             entities = tuple(entry for entry in all_entities if entry.disabled_by is None)
             available = any(
@@ -99,9 +97,7 @@ class HomeAssistantAccessDeviceDiscovery:
                         kind=AccessDeviceKind.KEYPAD,
                         integration=AccessDeviceIntegration.ZHA,
                         available=available,
-                        battery_percentage=(
-                            battery.percentage if battery is not None else None
-                        ),
+                        battery_percentage=(battery.percentage if battery is not None else None),
                         battery_status=battery.status.value if battery is not None else None,
                         battery_entity_id=battery.entity_id if battery is not None else None,
                     )
@@ -169,9 +165,7 @@ def _zigbee2mqtt_ieee_address(
             continue
         compact = identifier[len("zigbee2mqtt_") :].strip().lower().removeprefix("0x")
         compact = compact.replace(":", "").replace("-", "")
-        if len(compact) == 16 and all(
-            character in "0123456789abcdef" for character in compact
-        ):
+        if len(compact) == 16 and all(character in "0123456789abcdef" for character in compact):
             candidates.add(f"0x{compact}")
     return next(iter(candidates)) if len(candidates) == 1 else None
 

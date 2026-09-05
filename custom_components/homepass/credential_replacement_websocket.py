@@ -50,7 +50,7 @@ async def async_handle_validate_candidate(
         return
     try:
         changed = await service.validate_pin_candidate(_person_id(msg["person_id"]), msg["pin"])
-    except (ValueError, ValidationError):
+    except ValueError, ValidationError:
         connection.send_result(msg["id"], {"valid": False, "changed": False})
     except Exception:
         connection.send_error(msg["id"], "validation_unavailable", "Unable to validate PIN")
@@ -73,7 +73,7 @@ async def async_handle_replace_pin(
             if msg.get("retry") is True
             else await service.replace_pin(person_id, msg["pin"])
         )
-    except (ValueError, ValidationError):
+    except ValueError, ValidationError:
         connection.send_error(msg["id"], "validation", "Enter a different valid PIN")
     except ConcurrentCredentialReplacementError:
         connection.send_error(msg["id"], "concurrent_update", "Access changed concurrently")

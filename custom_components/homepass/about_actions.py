@@ -28,7 +28,7 @@ def async_register_about_action(hass: HomeAssistant, service: AboutService) -> N
     async def handle_get_about(_call: ServiceCall) -> ServiceResponse:
         try:
             about = await service.load()
-        except (HomeAssistantError, StorageError, KeyError, TypeError, ValueError):
+        except HomeAssistantError, StorageError, KeyError, TypeError, ValueError:
             raise HomeAssistantError("About information is unavailable") from None
         return cast(ServiceResponse, about.to_dict())
 

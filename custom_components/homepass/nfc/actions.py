@@ -12,8 +12,13 @@ from uuid import UUID
 import qrcode
 import qrcode.image.svg
 import voluptuous as vol
-from homeassistant.core import (HomeAssistant, ServiceCall, ServiceResponse,
-                                SupportsResponse, callback)
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import ServiceValidationError, Unauthorized
 
 from ..exceptions import HomePASSError
@@ -44,6 +49,7 @@ from .webauthn_service import HomePassWebAuthnService
 SERVICE_GET_NFC_ENROLLMENT_STATUS = "get_nfc_enrollment_status"
 SERVICE_LIST_NFC_ENROLLMENT_STATUSES = "list_nfc_enrollment_statuses"
 SERVICE_REVOKE_NFC_ENROLLMENT = "revoke_nfc_enrollment"
+
 
 async def _require_admin(hass: HomeAssistant, call: ServiceCall) -> None:
     if call.context.user_id is None:
@@ -100,15 +106,23 @@ def async_register_nfc_actions(
         token = secrets.token_urlsafe(32)
         now = utcnow()
         invite = EnrollmentInvite(
-            hash_token(token), person.person_id, person.display_name,
-            now + timedelta(hours=int(call.data["expires_in_hours"])), None, now)
+            hash_token(token),
+            person.person_id,
+            person.display_name,
+            now + timedelta(hours=int(call.data["expires_in_hours"])),
+            None,
+            now,
+        )
         await repository.create_invite(invite)
         enrollment_url = f"{webauthn.public_origin}/api/homepass/nfc/enroll/{token}"
-        return cast(ServiceResponse, {
-            "enrollment_url": enrollment_url,
-            "qr_code": _qr_code_data_uri(enrollment_url),
-            "expires_at": invite.expires_at.isoformat(),
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "enrollment_url": enrollment_url,
+                "qr_code": _qr_code_data_uri(enrollment_url),
+                "expires_at": invite.expires_at.isoformat(),
+            },
+        )
 
     async def _enrollment_status(person_id: UUID) -> dict[str, object]:
         credentials = await repository.list_credentials_for_person(person_id)
@@ -156,21 +170,24 @@ def async_register_nfc_actions(
             tags = await repository.list_tags_for_access_point(access_point_id)
         except (HomePASSError, TypeError, ValueError) as err:
             raise ServiceValidationError("HomePASS Door is invalid") from err
-        return cast(ServiceResponse, {
-            "access_point_id": str(access_point_id),
-            "tags": [
-                {
-                    "public_id": tag.public_id,
-                    "uid_hex": tag.uid_hex,
-                    "enabled": tag.enabled,
-                    "last_counter": tag.last_counter,
-                    "created_at": tag.created_at.isoformat(),
-                    "write_protected": tag.write_protected,
-                    "protection_prepared": tag.admin_key_credential_id is not None,
-                }
-                for tag in tags
-            ],
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "access_point_id": str(access_point_id),
+                "tags": [
+                    {
+                        "public_id": tag.public_id,
+                        "uid_hex": tag.uid_hex,
+                        "enabled": tag.enabled,
+                        "last_counter": tag.last_counter,
+                        "created_at": tag.created_at.isoformat(),
+                        "write_protected": tag.write_protected,
+                        "protection_prepared": tag.admin_key_credential_id is not None,
+                    }
+                    for tag in tags
+                ],
+            },
+        )
 
     async def revoke_tag(call: ServiceCall) -> ServiceResponse:
         """Temporarily disable one tag registered to one Door."""
@@ -178,17 +195,18 @@ def async_register_nfc_actions(
         try:
             access_point_id = UUID(call.data["access_point_id"])
             await access_points.get_target(access_point_id)
-            tag = await repository.revoke_tag(
-                str(call.data["public_id"]), access_point_id
-            )
+            tag = await repository.revoke_tag(str(call.data["public_id"]), access_point_id)
         except (HomePASSError, TypeError, ValueError) as err:
             raise ServiceValidationError("HomePASS could not revoke this NFC tag") from err
-        return cast(ServiceResponse, {
-            "access_point_id": str(access_point_id),
-            "public_id": tag.public_id,
-            "uid_hex": tag.uid_hex,
-            "revoked": True,
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "access_point_id": str(access_point_id),
+                "public_id": tag.public_id,
+                "uid_hex": tag.uid_hex,
+                "revoked": True,
+            },
+        )
 
     async def reinstate_tag(call: ServiceCall) -> ServiceResponse:
         """Re-enable one temporarily disabled tag registered to one Door."""
@@ -196,19 +214,18 @@ def async_register_nfc_actions(
         try:
             access_point_id = UUID(call.data["access_point_id"])
             await access_points.get_target(access_point_id)
-            tag = await repository.reinstate_tag(
-                str(call.data["public_id"]), access_point_id
-            )
+            tag = await repository.reinstate_tag(str(call.data["public_id"]), access_point_id)
         except (HomePASSError, TypeError, ValueError) as err:
-            raise ServiceValidationError(
-                "HomePASS could not reinstate this NFC tag"
-            ) from err
-        return cast(ServiceResponse, {
-            "access_point_id": str(access_point_id),
-            "public_id": tag.public_id,
-            "uid_hex": tag.uid_hex,
-            "enabled": True,
-        })
+            raise ServiceValidationError("HomePASS could not reinstate this NFC tag") from err
+        return cast(
+            ServiceResponse,
+            {
+                "access_point_id": str(access_point_id),
+                "public_id": tag.public_id,
+                "uid_hex": tag.uid_hex,
+                "enabled": True,
+            },
+        )
 
     async def delete_tag(call: ServiceCall) -> ServiceResponse:
         """Permanently delete one tag registration from HomePASS."""
@@ -232,15 +249,16 @@ def async_register_nfc_actions(
                     await vault.delete(stored_id)
             await repository.delete_tag(public_id, access_point_id)
         except (HomePASSError, TypeError, ValueError, VaultError) as err:
-            raise ServiceValidationError(
-                "HomePASS could not delete this NFC tag"
-            ) from err
-        return cast(ServiceResponse, {
-            "access_point_id": str(access_point_id),
-            "public_id": tag.public_id,
-            "uid_hex": tag.uid_hex,
-            "deleted": True,
-        })
+            raise ServiceValidationError("HomePASS could not delete this NFC tag") from err
+        return cast(
+            ServiceResponse,
+            {
+                "access_point_id": str(access_point_id),
+                "public_id": tag.public_id,
+                "uid_hex": tag.uid_hex,
+                "deleted": True,
+            },
+        )
 
     async def create_test_tag(call: ServiceCall) -> ServiceResponse:
         """Create a revocable static URL for temporary NTAG216 testing."""
@@ -250,9 +268,7 @@ def async_register_nfc_actions(
         except (TypeError, ValueError) as err:
             raise ServiceValidationError("HomePASS Door is invalid") from err
         if not await capabilities.supports_nfc_access(access_point_id):
-            raise ServiceValidationError(
-                "This Door cannot currently be unlocked through HomePASS"
-            )
+            raise ServiceValidationError("This Door cannot currently be unlocked through HomePASS")
         raw_token = secrets.token_urlsafe(32)
         now = utcnow()
         tag = NfcTestTag(
@@ -264,15 +280,16 @@ def async_register_nfc_actions(
         )
         await repository.replace_test_tag(tag)
         test_url = f"{webauthn.public_origin}/api/homepass/nfc/test/{raw_token}"
-        return cast(ServiceResponse, {
-            "active": True,
-            "test_url": test_url,
-            "qr_code": _qr_code_data_uri(test_url),
-            "expires_at": tag.expires_at.isoformat(),
-            "warning": (
-                "NTAG216 test URLs can be copied. Revoke this tag after testing."
-            ),
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "active": True,
+                "test_url": test_url,
+                "qr_code": _qr_code_data_uri(test_url),
+                "expires_at": tag.expires_at.isoformat(),
+                "warning": ("NTAG216 test URLs can be copied. Revoke this tag after testing."),
+            },
+        )
 
     async def get_test_tag_status(call: ServiceCall) -> ServiceResponse:
         await _require_admin(hass, call)
@@ -281,10 +298,13 @@ def async_register_nfc_actions(
         except (TypeError, ValueError) as err:
             raise ServiceValidationError("HomePASS Door is invalid") from err
         tag = await repository.active_test_tag_for_access_point(access_point_id)
-        return cast(ServiceResponse, {
-            "active": tag is not None,
-            "expires_at": None if tag is None else tag.expires_at.isoformat(),
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "active": tag is not None,
+                "expires_at": None if tag is None else tag.expires_at.isoformat(),
+            },
+        )
 
     async def revoke_test_tag(call: ServiceCall) -> ServiceResponse:
         await _require_admin(hass, call)
@@ -303,14 +323,17 @@ def async_register_nfc_actions(
         except (TypeError, ValueError) as err:
             raise ServiceValidationError("HomePASS User is invalid") from err
         revoked_records = await repository.disable_credentials_for_person(person_id)
-        return cast(ServiceResponse, {
-            "person_id": str(person_id),
-            "enrolled": False,
-            "credential_count": 0,
-            "access_count": 0,
-            "access_point_ids": [],
-            "revoked_records": revoked_records,
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "person_id": str(person_id),
+                "enrolled": False,
+                "credential_count": 0,
+                "access_count": 0,
+                "access_point_ids": [],
+                "revoked_records": revoked_records,
+            },
+        )
 
     async def prepare_tag(call: ServiceCall) -> ServiceResponse:
         await _require_admin(hass, call)
@@ -342,8 +365,16 @@ def async_register_nfc_actions(
             await vault.delete(file_id)
             raise
         tag = NfcTag(
-            secrets.token_urlsafe(12), uid_hex, access_point_id,
-            str(meta_id), str(file_id), True, None, utcnow(), str(admin_id), False,
+            secrets.token_urlsafe(12),
+            uid_hex,
+            access_point_id,
+            str(meta_id),
+            str(file_id),
+            True,
+            None,
+            utcnow(),
+            str(admin_id),
+            False,
         )
         try:
             await repository.upsert_tag(tag)
@@ -352,16 +383,20 @@ def async_register_nfc_actions(
             await vault.delete(file_id)
             await vault.delete(admin_id)
             raise
-        return cast(ServiceResponse, {
-            "public_id": tag.public_id,
-            "ndef_url_template": (
-                f"{webauthn.public_origin}/api/homepass/nfc/t/{tag.public_id}"
-                "?e=00000000000000000000000000000000&c=0000000000000000"),
-            "meta_read_key": meta_key.hex().upper(),
-            "file_read_key": file_key.hex().upper(),
-            "admin_key": admin_key.hex().upper(),
-            "profile": "encrypted_picc_zero_length_mac",
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "public_id": tag.public_id,
+                "ndef_url_template": (
+                    f"{webauthn.public_origin}/api/homepass/nfc/t/{tag.public_id}"
+                    "?e=00000000000000000000000000000000&c=0000000000000000"
+                ),
+                "meta_read_key": meta_key.hex().upper(),
+                "file_read_key": file_key.hex().upper(),
+                "admin_key": admin_key.hex().upper(),
+                "profile": "encrypted_picc_zero_length_mac",
+            },
+        )
 
     async def prepare_tag_protection(call: ServiceCall) -> ServiceResponse:
         """Return a recoverable one-row conversion package for an existing tag."""
@@ -374,12 +409,12 @@ def async_register_nfc_actions(
                 raise ValueError("NFC tag is not registered to this Door")
             if tag.write_protected:
                 raise ValueError("NFC tag is already write protected")
-            meta_key = await vault.retrieve(VaultCredentialId.from_string(
-                tag.meta_key_credential_id
-            ))
-            file_key = await vault.retrieve(VaultCredentialId.from_string(
-                tag.file_key_credential_id
-            ))
+            meta_key = await vault.retrieve(
+                VaultCredentialId.from_string(tag.meta_key_credential_id)
+            )
+            file_key = await vault.retrieve(
+                VaultCredentialId.from_string(tag.file_key_credential_id)
+            )
             if tag.admin_key_credential_id is None:
                 admin_key = secrets.token_bytes(16).hex().upper()
                 admin_id = await vault.store(admin_key)
@@ -391,25 +426,28 @@ def async_register_nfc_actions(
                     await vault.delete(admin_id)
                     raise
             else:
-                admin_key = await vault.retrieve(VaultCredentialId.from_string(
-                    tag.admin_key_credential_id
-                ))
+                admin_key = await vault.retrieve(
+                    VaultCredentialId.from_string(tag.admin_key_credential_id)
+                )
         except (HomePASSError, TypeError, ValueError, VaultError) as err:
             raise ServiceValidationError(
                 "HomePASS could not prepare rewrite protection for this NFC tag"
             ) from err
-        return cast(ServiceResponse, {
-            "public_id": tag.public_id,
-            "uid_hex": tag.uid_hex,
-            "ndef_url_template": (
-                f"{webauthn.public_origin}/api/homepass/nfc/t/{tag.public_id}"
-                "?e=00000000000000000000000000000000&c=0000000000000000"
-            ),
-            "current_admin_key": "00000000000000000000000000000000",
-            "admin_key": admin_key,
-            "file_read_key": file_key,
-            "meta_read_key": meta_key,
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "public_id": tag.public_id,
+                "uid_hex": tag.uid_hex,
+                "ndef_url_template": (
+                    f"{webauthn.public_origin}/api/homepass/nfc/t/{tag.public_id}"
+                    "?e=00000000000000000000000000000000&c=0000000000000000"
+                ),
+                "current_admin_key": "00000000000000000000000000000000",
+                "admin_key": admin_key,
+                "file_read_key": file_key,
+                "meta_read_key": meta_key,
+            },
+        )
 
     async def confirm_tag_protection(call: ServiceCall) -> ServiceResponse:
         """Record protection only after the administrator observed VERIFIED."""
@@ -423,11 +461,14 @@ def async_register_nfc_actions(
             raise ServiceValidationError(
                 "HomePASS could not confirm rewrite protection for this NFC tag"
             ) from err
-        return cast(ServiceResponse, {
-            "public_id": tag.public_id,
-            "uid_hex": tag.uid_hex,
-            "write_protected": True,
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "public_id": tag.public_id,
+                "uid_hex": tag.uid_hex,
+                "write_protected": True,
+            },
+        )
 
     async def update_access(call: ServiceCall) -> ServiceResponse:
         """Replace explicit NFC Door assignments without creating PIN records."""
@@ -456,83 +497,142 @@ def async_register_nfc_actions(
             raise ServiceValidationError(
                 "HomePASS could not update NFC access assignments"
             ) from err
-        return cast(ServiceResponse, {
-            "person_id": str(person_id),
-            "access_point_ids": [str(grant.access_point_id) for grant in grants],
-        })
+        return cast(
+            ServiceResponse,
+            {
+                "person_id": str(person_id),
+                "access_point_ids": [str(grant.access_point_id) for grant in grants],
+            },
+        )
 
     hass.services.async_register(
-        DOMAIN, SERVICE_CREATE_NFC_ENROLLMENT, create_enrollment,
-        schema=vol.Schema({vol.Required("person_id"): str,
-            vol.Optional("expires_in_hours", default=24): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=168))}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_CREATE_NFC_ENROLLMENT,
+        create_enrollment,
+        schema=vol.Schema(
+            {
+                vol.Required("person_id"): str,
+                vol.Optional("expires_in_hours", default=24): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=168)
+                ),
+            }
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_GET_NFC_ENROLLMENT_STATUS, get_enrollment_status,
+        DOMAIN,
+        SERVICE_GET_NFC_ENROLLMENT_STATUS,
+        get_enrollment_status,
         schema=vol.Schema({vol.Required(ATTR_PERSON_ID): str}),
-        supports_response=SupportsResponse.ONLY)
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_LIST_NFC_ENROLLMENT_STATUSES, list_enrollment_statuses,
+        DOMAIN,
+        SERVICE_LIST_NFC_ENROLLMENT_STATUSES,
+        list_enrollment_statuses,
         schema=vol.Schema({}),
-        supports_response=SupportsResponse.ONLY)
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_REVOKE_NFC_ENROLLMENT, revoke_enrollment,
+        DOMAIN,
+        SERVICE_REVOKE_NFC_ENROLLMENT,
+        revoke_enrollment,
         schema=vol.Schema({vol.Required(ATTR_PERSON_ID): str}),
-        supports_response=SupportsResponse.ONLY)
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_CREATE_NFC_TEST_TAG, create_test_tag,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Optional("expires_in_hours", default=168): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=720))}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_CREATE_NFC_TEST_TAG,
+        create_test_tag,
+        schema=vol.Schema(
+            {
+                vol.Required("access_point_id"): str,
+                vol.Optional("expires_in_hours", default=168): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=720)
+                ),
+            }
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_GET_NFC_TEST_TAG_STATUS, get_test_tag_status,
+        DOMAIN,
+        SERVICE_GET_NFC_TEST_TAG_STATUS,
+        get_test_tag_status,
         schema=vol.Schema({vol.Required("access_point_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_REVOKE_NFC_TEST_TAG, revoke_test_tag,
+        DOMAIN,
+        SERVICE_REVOKE_NFC_TEST_TAG,
+        revoke_test_tag,
         schema=vol.Schema({vol.Required("access_point_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_PREPARE_NFC_TAG, prepare_tag,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Required("uid_hex"): str, vol.Optional("meta_read_key"): str,
-            vol.Optional("file_read_key"): str}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_PREPARE_NFC_TAG,
+        prepare_tag,
+        schema=vol.Schema(
+            {
+                vol.Required("access_point_id"): str,
+                vol.Required("uid_hex"): str,
+                vol.Optional("meta_read_key"): str,
+                vol.Optional("file_read_key"): str,
+            }
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_PREPARE_NFC_TAG_PROTECTION, prepare_tag_protection,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Required("public_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_PREPARE_NFC_TAG_PROTECTION,
+        prepare_tag_protection,
+        schema=vol.Schema({vol.Required("access_point_id"): str, vol.Required("public_id"): str}),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_CONFIRM_NFC_TAG_PROTECTION, confirm_tag_protection,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Required("public_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_CONFIRM_NFC_TAG_PROTECTION,
+        confirm_tag_protection,
+        schema=vol.Schema({vol.Required("access_point_id"): str, vol.Required("public_id"): str}),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_UPDATE_NFC_ACCESS, update_access,
-        schema=vol.Schema({vol.Required(ATTR_PERSON_ID): str,
-            vol.Required(ATTR_ACCESS_POINT_IDS): [str]}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_UPDATE_NFC_ACCESS,
+        update_access,
+        schema=vol.Schema(
+            {vol.Required(ATTR_PERSON_ID): str, vol.Required(ATTR_ACCESS_POINT_IDS): [str]}
+        ),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_LIST_NFC_TAGS, list_tags,
+        DOMAIN,
+        SERVICE_LIST_NFC_TAGS,
+        list_tags,
         schema=vol.Schema({vol.Required("access_point_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_REVOKE_NFC_TAG, revoke_tag,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Required("public_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_REVOKE_NFC_TAG,
+        revoke_tag,
+        schema=vol.Schema({vol.Required("access_point_id"): str, vol.Required("public_id"): str}),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_REINSTATE_NFC_TAG, reinstate_tag,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Required("public_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_REINSTATE_NFC_TAG,
+        reinstate_tag,
+        schema=vol.Schema({vol.Required("access_point_id"): str, vol.Required("public_id"): str}),
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_NFC_TAG, delete_tag,
-        schema=vol.Schema({vol.Required("access_point_id"): str,
-            vol.Required("public_id"): str}),
-        supports_response=SupportsResponse.ONLY)
+        DOMAIN,
+        SERVICE_DELETE_NFC_TAG,
+        delete_tag,
+        schema=vol.Schema({vol.Required("access_point_id"): str, vol.Required("public_id"): str}),
+        supports_response=SupportsResponse.ONLY,
+    )
 
 
 @callback

@@ -56,13 +56,9 @@ type AccessUpdateStatus = Literal[
 ]
 
 
-def _next_available_keypad_slot(
-    metadata: Iterable[AccessMetadata], access_point_id: UUID
-) -> int:
+def _next_available_keypad_slot(metadata: Iterable[AccessMetadata], access_point_id: UUID) -> int:
     """Return the first unowned logical credential slot for one keypad Door."""
-    occupied = {
-        record.slot for record in metadata if record.access_point_id == access_point_id
-    }
+    occupied = {record.slot for record in metadata if record.access_point_id == access_point_id}
     slot = 1
     while slot in occupied:
         slot += 1
@@ -453,10 +449,7 @@ class AccessManagementService:
                         raise ValueError("PIN access driver is unavailable")
                     provider_schedule = None
                     provider_enabled = person.enabled
-                    if (
-                        target.driver is AccessDriver.NUKI
-                        and self._schedule_service is not None
-                    ):
+                    if target.driver is AccessDriver.NUKI and self._schedule_service is not None:
                         schedule = await self._schedule_service.get_schedule(person.schedule_id)
                         provider_schedule = authorization_schedule_from_homepass(schedule)
                         provider_enabled = provider_enabled and schedule.enabled

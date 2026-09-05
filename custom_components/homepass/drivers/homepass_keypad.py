@@ -55,9 +55,7 @@ class HomePassKeypadCredentialDriver:
         _request: CredentialRemovalRequest,
     ) -> CredentialRemovalVerificationResult:
         """Confirm that no credential remains on the physical keypad."""
-        return CredentialRemovalVerificationResult(
-            CredentialRemovalVerificationStatus.REMOVED
-        )
+        return CredentialRemovalVerificationResult(CredentialRemovalVerificationStatus.REMOVED)
 
 
 __all__ = ["HomePassKeypadCredentialDriver"]

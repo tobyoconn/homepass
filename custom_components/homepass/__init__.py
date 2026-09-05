@@ -207,7 +207,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HomePassConfigEntry) -> 
             authorization_provider_registry.register(
                 AccessDriver.NUKI.value, nuki_authorization_provider
             )
-        except (ValueError, VaultError):
+        except ValueError, VaultError:
             _LOGGER.error(
                 "Nuki local access is enabled but its encrypted pairing is unavailable; "
                 "re-pair Nuki in HomePASS integration options"

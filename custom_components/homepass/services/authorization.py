@@ -250,7 +250,7 @@ class AuthorizationService:
                     person_id = UUID(person_key)
                     context = _decode_snapshot(snapshot, person_id, access_point.id)
                     decision = _authorize_context(context, access_point, instant_utc)
-                except (HomePASSError, TypeError, ValueError):
+                except HomePASSError, TypeError, ValueError:
                     person = _try_decode_person(snapshot, person_key)
                     cells.append(AuthorizationMatrixCell(access_point, person, None))
                     continue
@@ -359,7 +359,7 @@ def _try_decode_person(snapshot: HomePassStorageData, person_key: str) -> Person
     """Best-effort Person identity for an unavailable matrix cell."""
     try:
         return _decode_person(snapshot, UUID(person_key))
-    except (HomePASSError, TypeError, ValueError):
+    except HomePASSError, TypeError, ValueError:
         return None
 
 
@@ -449,9 +449,7 @@ def _decode_managed_state(settings: object, access_point_id: UUID) -> bool:
     enrollment = enrollments.get(str(access_point_id))
     if enrollment is None:
         return False
-    if not isinstance(enrollment, dict) or not {
-        "discovery_key", "managed"
-    } <= set(enrollment):
+    if not isinstance(enrollment, dict) or not {"discovery_key", "managed"} <= set(enrollment):
         raise AuthorizationContextError
     discovery_key = enrollment["discovery_key"]
     managed = enrollment["managed"]

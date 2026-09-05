@@ -28,19 +28,34 @@ async def test_list_disable_reinstate_and_delete_one_tag_without_affecting_anoth
     door_id = uuid4()
     other_door_id = uuid4()
     first = NfcTag(
-        "abcdefghijklmnop", "04010203040501", door_id,
-        str(uuid4()), str(uuid4()), True, 10, datetime.now(UTC),
+        "abcdefghijklmnop",
+        "04010203040501",
+        door_id,
+        str(uuid4()),
+        str(uuid4()),
+        True,
+        10,
+        datetime.now(UTC),
     )
     second = NfcTag(
-        "qrstuvwxyzABCDEF", "04010203040502", other_door_id,
-        str(uuid4()), str(uuid4()), True, None, datetime.now(UTC),
+        "qrstuvwxyzABCDEF",
+        "04010203040502",
+        other_door_id,
+        str(uuid4()),
+        str(uuid4()),
+        True,
+        None,
+        datetime.now(UTC),
     )
     repository = object.__new__(NfcAccessRepository)
     repository._lock = asyncio.Lock()
     repository._data = {
         "tags": {first.public_id: first.to_dict(), second.public_id: second.to_dict()},
-        "test_tags": {}, "credentials": {}, "invites": {},
-        "access_grants": {}, "audit": [],
+        "test_tags": {},
+        "credentials": {},
+        "invites": {},
+        "access_grants": {},
+        "audit": [],
     }
     repository._store = _Store(repository._data)
 
@@ -69,14 +84,24 @@ async def test_list_disable_reinstate_and_delete_one_tag_without_affecting_anoth
 async def test_existing_tag_can_record_recoverable_write_protection() -> None:
     door_id = uuid4()
     tag = NfcTag(
-        "abcdefghijklmnop", "04010203040503", door_id,
-        str(uuid4()), str(uuid4()), True, 20, datetime.now(UTC),
+        "abcdefghijklmnop",
+        "04010203040503",
+        door_id,
+        str(uuid4()),
+        str(uuid4()),
+        True,
+        20,
+        datetime.now(UTC),
     )
     repository = object.__new__(NfcAccessRepository)
     repository._lock = asyncio.Lock()
     repository._data = {
-        "tags": {tag.public_id: tag.to_dict()}, "test_tags": {},
-        "credentials": {}, "invites": {}, "access_grants": {}, "audit": [],
+        "tags": {tag.public_id: tag.to_dict()},
+        "test_tags": {},
+        "credentials": {},
+        "invites": {},
+        "access_grants": {},
+        "audit": [],
     }
     repository._store = _Store(repository._data)
     admin_id = str(uuid4())
@@ -96,22 +121,37 @@ async def test_failed_save_does_not_change_live_tag_state() -> None:
     """A storage failure must not leave an in-memory tag change partially applied."""
     door_id = uuid4()
     tag = NfcTag(
-        "abcdefghijklmnop", "04010203040503", door_id,
-        str(uuid4()), str(uuid4()), True, 20, datetime.now(UTC),
+        "abcdefghijklmnop",
+        "04010203040503",
+        door_id,
+        str(uuid4()),
+        str(uuid4()),
+        True,
+        20,
+        datetime.now(UTC),
     )
     original = tag.to_dict()
     repository = object.__new__(NfcAccessRepository)
     repository._lock = asyncio.Lock()
     repository._data = {
-        "tags": {tag.public_id: original}, "test_tags": {},
-        "credentials": {}, "invites": {}, "access_grants": {}, "audit": [],
+        "tags": {tag.public_id: original},
+        "test_tags": {},
+        "credentials": {},
+        "invites": {},
+        "access_grants": {},
+        "audit": [],
     }
     repository._store = _FailingStore()
 
     replacement = NfcTag(
-        tag.public_id, tag.uid_hex, tag.access_point_id,
-        tag.meta_key_credential_id, tag.file_key_credential_id,
-        False, tag.last_counter, tag.created_at,
+        tag.public_id,
+        tag.uid_hex,
+        tag.access_point_id,
+        tag.meta_key_credential_id,
+        tag.file_key_credential_id,
+        False,
+        tag.last_counter,
+        tag.created_at,
     )
     with pytest.raises(OSError, match="storage unavailable"):
         await repository.upsert_tag(replacement)

@@ -59,7 +59,7 @@ def async_register_policy_explanation_actions(
                 access_point_id=cast(UUID, call.data[ATTR_ACCESS_POINT_ID]),
                 instant_utc=datetime.now(UTC),
             )
-        except (HomePASSError, ValueError):
+        except HomePASSError, ValueError:
             raise HomeAssistantError("Policy explanation is unavailable") from None
         return cast(ServiceResponse, explanation.to_dict())
 

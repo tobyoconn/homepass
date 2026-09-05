@@ -30,7 +30,7 @@ def async_register_dashboard_attention_actions(
     async def handle_get_dashboard_attention(_call: ServiceCall) -> ServiceResponse:
         try:
             summary = await service.get_dashboard_attention()
-        except (HomeAssistantError, KeyError, TypeError, ValueError):
+        except HomeAssistantError, KeyError, TypeError, ValueError:
             raise HomeAssistantError("Synchronization attention unavailable") from None
         return cast(ServiceResponse, summary.to_dict())
 

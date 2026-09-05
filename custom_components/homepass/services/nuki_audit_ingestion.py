@@ -63,10 +63,8 @@ class NukiAuditIngestionService:
         if self._started:
             return
         self._started = True
-        self._evidence_unsubscribe = (
-            self._physical_activity.register_unlock_evidence_entity(
-                self._lock_entity_id
-            )
+        self._evidence_unsubscribe = self._physical_activity.register_unlock_evidence_entity(
+            self._lock_entity_id
         )
         self._state_unsubscribe = async_track_state_change_event(
             self._hass, [self._lock_entity_id], self._handle_lock_state
@@ -74,9 +72,7 @@ class NukiAuditIngestionService:
         self._timer_unsubscribe = async_track_time_interval(
             self._hass, self._handle_interval, _POLL_INTERVAL
         )
-        self._schedule(
-            self._poll_safely(process=False), "HomePASS Nuki audit baseline"
-        )
+        self._schedule(self._poll_safely(process=False), "HomePASS Nuki audit baseline")
 
     async def async_stop(self) -> None:
         """Release listeners and finish already accepted polling work."""
@@ -137,9 +133,7 @@ class NukiAuditIngestionService:
             async with self._poll_lock:
                 async with asyncio.timeout(_POLL_TIMEOUT):
                     events = await self._provider.list_audit_events(limit=50)
-                unseen = tuple(
-                    event for event in events if event.external_id not in self._seen
-                )
+                unseen = tuple(event for event in events if event.external_id not in self._seen)
                 for event in events:
                     self._seen[event.external_id] = event
                 if len(self._seen) > 200:

@@ -33,9 +33,14 @@ def _truncated_cmac(key: bytes, value: bytes) -> bytes:
     return _aes_cmac(key, value)[1::2]
 
 
-def verify_encrypted_picc_sun(*, encrypted_picc_hex: str, mac_hex: str,
-                              meta_read_key: bytes, file_read_key: bytes,
-                              expected_uid_hex: str) -> SunMessage:
+def verify_encrypted_picc_sun(
+    *,
+    encrypted_picc_hex: str,
+    mac_hex: str,
+    meta_read_key: bytes,
+    file_read_key: bytes,
+    expected_uid_hex: str,
+) -> SunMessage:
     """Verify and decode one tag tap using NXP's encrypted-PICC profile."""
     if len(meta_read_key) != 16 or len(file_read_key) != 16:
         raise SunVerificationError("NTAG 424 keys must be AES-128 keys")

@@ -69,7 +69,7 @@ class AccessPointCommandService:
         try:
             target = await self._access_points.get_target(access_point_id)
             state = await self._access_points.resolve_state(access_point_id)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return False
         if not target.access_point.enabled or not target.nfc_capable:
             return False

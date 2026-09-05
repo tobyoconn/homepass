@@ -106,4 +106,3 @@ class HomePassRuntimeData:
 
 
 HomePassConfigEntry = ConfigEntry[HomePassRuntimeData]
-

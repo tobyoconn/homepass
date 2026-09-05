@@ -144,7 +144,7 @@ def _percentage(value: object) -> int | None:
         return None
     try:
         numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not 0 <= numeric <= 100:
         return None

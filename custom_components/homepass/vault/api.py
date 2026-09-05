@@ -69,10 +69,10 @@ class CredentialVault:
                     await self._key_repository.store(key)
                 self._encryption = VaultEncryption(key)
                 self._status = VaultStatus.UNLOCKED
-            except (VaultUnsupportedKeyVersionError, VaultUnavailableError):
+            except VaultUnsupportedKeyVersionError, VaultUnavailableError:
                 self._status = VaultStatus.UNAVAILABLE
                 raise
-            except (VaultCorruptDataError, VaultUnsupportedSchemaVersionError):
+            except VaultCorruptDataError, VaultUnsupportedSchemaVersionError:
                 self._status = VaultStatus.CORRUPT
                 raise
 

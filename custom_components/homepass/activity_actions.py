@@ -104,7 +104,7 @@ def async_register_activity_actions(
                 if activity_filter.active
                 else await activity_read_service.list_recent(limit)
             )
-        except (StorageError, TypeError, ValueError):
+        except StorageError, TypeError, ValueError:
             raise HomeAssistantError("Recent Activity is unavailable") from None
         return cast(
             ServiceResponse,

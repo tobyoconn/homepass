@@ -487,7 +487,7 @@ class CredentialRevealService:
                 )
                 credential_id = None if metadata is None else metadata.vault_credential_id
                 _trace_stage(trace, "access_metadata_lookup_completed")
-        except (CredentialAuthorityConflictError, StorageError):
+        except CredentialAuthorityConflictError, StorageError:
             await self._audit_failed(
                 ha_user_id,
                 person_id,
@@ -517,7 +517,7 @@ class CredentialRevealService:
                 trace=trace,
             )
             raise RevealCredentialUnavailableError from None
-        except (VaultNotInitializedError, VaultUnavailableError):
+        except VaultNotInitializedError, VaultUnavailableError:
             await self._audit(
                 ha_user_id,
                 person_id,

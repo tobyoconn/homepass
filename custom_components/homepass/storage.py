@@ -572,7 +572,7 @@ def _validate_domain_snapshot(raw: object) -> HomePassStorageData:
                 notification_preferences = NotificationPreferences.migrate_dict(
                     raw_notification_preferences
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 settings = snapshot["data"]["settings"]
                 settings.setdefault(
                     _NOTIFICATION_PREFERENCES_RECOVERY_BACKUP_SETTING,

@@ -45,9 +45,7 @@ from .vault.identifiers import VaultCredentialId
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 
-_CONFIG_SCHEMA = vol.Schema(
-    {vol.Required(CONF_INSTANCE_NAME, default=DEFAULT_INSTANCE_NAME): str}
-)
+_CONFIG_SCHEMA = vol.Schema({vol.Required(CONF_INSTANCE_NAME, default=DEFAULT_INSTANCE_NAME): str})
 
 _CONF_NUKI_DELETE_AUTHORIZATIONS = "nuki_delete_authorizations"
 _CONF_NUKI_DELETE_ALL_AUTHORIZATIONS = "nuki_delete_all_authorizations"
@@ -95,9 +93,7 @@ class HomePassConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Return the HomePASS options flow."""
         return HomePassOptionsFlow(config_entry)
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle initial setup."""
         if user_input is not None:
             name = user_input[CONF_INSTANCE_NAME].strip()
@@ -130,25 +126,15 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
         self._pending_nuki_initial_pairing = False
         self._pending_nuki_delete_authorizations: set[str] = set()
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Configure the fixed public HTTPS origin used by NFC passkeys."""
         errors: dict[str, str] = {}
         pairing_guidance = ""
         current = str(self._config_entry.options.get(CONF_NFC_PUBLIC_ORIGIN, ""))
-        current_nuki_enabled = bool(
-            self._config_entry.options.get(CONF_NUKI_ENABLED, False)
-        )
-        current_nuki_entity = str(
-            self._config_entry.options.get(CONF_NUKI_LOCK_ENTITY_ID, "")
-        )
-        current_nuki_address = str(
-            self._config_entry.options.get(CONF_NUKI_BLE_ADDRESS, "")
-        )
-        current_credential_id = str(
-            self._config_entry.options.get(CONF_NUKI_BLE_CREDENTIAL_ID, "")
-        )
+        current_nuki_enabled = bool(self._config_entry.options.get(CONF_NUKI_ENABLED, False))
+        current_nuki_entity = str(self._config_entry.options.get(CONF_NUKI_LOCK_ENTITY_ID, ""))
+        current_nuki_address = str(self._config_entry.options.get(CONF_NUKI_BLE_ADDRESS, ""))
+        current_credential_id = str(self._config_entry.options.get(CONF_NUKI_BLE_CREDENTIAL_ID, ""))
         if current_credential_id and current_nuki_address:
             pairing_guidance = (
                 "Existing HomePASS Bluetooth authorization found. HomePASS will reuse it; "
@@ -172,13 +158,8 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                     errors[CONF_NUKI_LOCK_ENTITY_ID] = "invalid_nuki_lock_entity"
                 if nuki_address not in discovered_nuki:
                     errors[CONF_NUKI_BLE_ADDRESS] = "nuki_not_discovered"
-                reuse_pairing = bool(
-                    credential_id
-                    and current_nuki_address == nuki_address
-                )
-                if not reuse_pairing and (
-                    len(security_pin) != 6 or not security_pin.isdecimal()
-                ):
+                reuse_pairing = bool(credential_id and current_nuki_address == nuki_address)
+                if not reuse_pairing and (len(security_pin) != 6 or not security_pin.isdecimal()):
                     errors[CONF_NUKI_SECURITY_PIN] = "invalid_nuki_security_pin"
                 if not errors and not reuse_pairing:
                     try:
@@ -195,9 +176,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                             err.translation_key,
                         )
                         if err.translation_key == "nuki_pairing_bad_pin":
-                            errors[CONF_NUKI_SECURITY_PIN] = (
-                                "invalid_nuki_security_pin"
-                            )
+                            errors[CONF_NUKI_SECURITY_PIN] = "invalid_nuki_security_pin"
                         else:
                             errors["base"] = "nuki_pairing_failed"
                         pairing_guidance = _NUKI_PAIRING_GUIDANCE.get(
@@ -235,11 +214,9 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                         vault = CredentialVault(self.hass)
                         await vault.initialize()
                         credential = NukiBluetoothCredential.deserialize(
-                            await vault.retrieve(
-                                VaultCredentialId.from_string(credential_id)
-                            )
+                            await vault.retrieve(VaultCredentialId.from_string(credential_id))
                         )
-                    except (ValueError, VaultError):
+                    except ValueError, VaultError:
                         errors["base"] = "nuki_vault_unavailable"
                 if not errors:
                     provider = NukiLocalAuthorizationProvider(
@@ -310,9 +287,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
-                        CONF_NFC_PUBLIC_ORIGIN, default=current
-                    ): selector.TextSelector(
+                    vol.Optional(CONF_NFC_PUBLIC_ORIGIN, default=current): selector.TextSelector(
                         selector.TextSelectorConfig(
                             type=selector.TextSelectorType.URL,
                             autocomplete="url",
@@ -331,9 +306,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                         selector.SelectSelectorConfig(
                             options=(
                                 [
-                                    selector.SelectOptionDict(
-                                        value=address, label=label
-                                    )
+                                    selector.SelectOptionDict(value=address, label=label)
                                     for address, label in discovered_nuki.items()
                                 ]
                                 or [
@@ -365,9 +338,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             return await self.async_step_init()
 
         errors: dict[str, str] = {}
-        known_ids = {
-            record.external_id for record in self._pending_nuki_authorizations
-        }
+        known_ids = {record.external_id for record in self._pending_nuki_authorizations}
         if user_input is not None:
             delete_all = self._pending_nuki_initial_pairing and bool(
                 user_input.get(_CONF_NUKI_DELETE_ALL_AUTHORIZATIONS, False)
@@ -375,12 +346,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             selected = (
                 known_ids
                 if delete_all
-                else {
-                    str(value)
-                    for value in user_input.get(
-                        _CONF_NUKI_DELETE_AUTHORIZATIONS, []
-                    )
-                }
+                else {str(value) for value in user_input.get(_CONF_NUKI_DELETE_AUTHORIZATIONS, [])}
             )
             if not selected.issubset(known_ids):
                 errors["base"] = "nuki_authorization_selection_invalid"
@@ -399,16 +365,16 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
         ]
         schema: dict[vol.Marker, object] = {}
         if self._pending_nuki_initial_pairing:
-            schema[
-                vol.Optional(_CONF_NUKI_DELETE_ALL_AUTHORIZATIONS, default=False)
-            ] = selector.BooleanSelector()
-        schema[
-            vol.Optional(_CONF_NUKI_DELETE_AUTHORIZATIONS, default=[])
-        ] = selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=options,
-                multiple=True,
-                mode=selector.SelectSelectorMode.LIST,
+            schema[vol.Optional(_CONF_NUKI_DELETE_ALL_AUTHORIZATIONS, default=False)] = (
+                selector.BooleanSelector()
+            )
+        schema[vol.Optional(_CONF_NUKI_DELETE_AUTHORIZATIONS, default=[])] = (
+            selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options,
+                    multiple=True,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
             )
         )
         return self.async_show_form(
@@ -425,18 +391,14 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             return await self.async_step_init()
 
         selected = self._pending_nuki_delete_authorizations
-        known = {
-            record.external_id: record for record in self._pending_nuki_authorizations
-        }
+        known = {record.external_id: record for record in self._pending_nuki_authorizations}
         if not selected or not selected.issubset(known):
             return await self.async_step_nuki_existing_pins()
 
         errors: dict[str, str] = {}
         if user_input is not None:
             for external_id in sorted(selected, key=int):
-                mutation = await self._pending_nuki_provider.delete_authorization(
-                    external_id
-                )
+                mutation = await self._pending_nuki_provider.delete_authorization(external_id)
                 if mutation.state is AuthorizationMutationState.FAILED:
                     errors["base"] = "nuki_authorization_delete_failed"
                     break
@@ -478,8 +440,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             managed_ids = {
                 str(record.slot)
                 for record in metadata
-                if record.driver is AccessDriver.NUKI
-                and record.lock_entity_id == lock_entity_id
+                if record.driver is AccessDriver.NUKI and record.lock_entity_id == lock_entity_id
             }
         for attempt in range(attempts):
             try:
@@ -490,9 +451,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                 await asyncio.sleep(_NUKI_AUTHORIZATION_SCAN_RETRY_DELAY)
             else:
                 return tuple(
-                    record
-                    for record in authorizations
-                    if record.external_id not in managed_ids
+                    record for record in authorizations if record.external_id not in managed_ids
                 )
         raise AssertionError("Nuki authorization scan retry loop did not terminate")
 
@@ -535,9 +494,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
     def _discovered_nuki_locks(self, current_address: str) -> dict[str, str]:
         """Return connectable Nuki locks without exposing unrelated BLE devices."""
         locks: dict[str, str] = {}
-        for info in bluetooth.async_discovered_service_info(
-            self.hass, connectable=True
-        ):
+        for info in bluetooth.async_discovered_service_info(self.hass, connectable=True):
             name = (info.name or info.address).strip()
             service_uuids = {value.lower() for value in info.service_uuids}
             if "nuki" not in name.lower() and (

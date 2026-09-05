@@ -54,14 +54,14 @@ def async_register_settings_actions(
     async def handle_get(_call: ServiceCall) -> ServiceResponse:
         try:
             settings = await notification_service.load()
-        except (HomeAssistantError, KeyError, TypeError, ValueError):
+        except HomeAssistantError, KeyError, TypeError, ValueError:
             raise HomeAssistantError("Notification settings are unavailable") from None
         return cast("ServiceResponse", settings.to_dict())
 
     async def handle_save(call: ServiceCall) -> ServiceResponse:
         try:
             settings = await notification_service.save(call.data[ATTR_PREFERENCES])
-        except (HomeAssistantError, KeyError, TypeError, ValueError):
+        except HomeAssistantError, KeyError, TypeError, ValueError:
             raise HomeAssistantError("Notification settings could not be saved") from None
         return cast("ServiceResponse", settings.to_dict())
 
@@ -76,7 +76,7 @@ def async_register_settings_actions(
     async def handle_get_property(_call: ServiceCall) -> ServiceResponse:
         try:
             settings = await property_service.load()
-        except (HomeAssistantError, KeyError, TypeError, ValueError):
+        except HomeAssistantError, KeyError, TypeError, ValueError:
             raise HomeAssistantError("Property Settings are unavailable") from None
         return cast("ServiceResponse", settings.to_dict())
 
@@ -91,7 +91,7 @@ def async_register_settings_actions(
                     "error": {"code": err.code, "message": err.user_message},
                 },
             )
-        except (HomeAssistantError, KeyError, TypeError, ValueError):
+        except HomeAssistantError, KeyError, TypeError, ValueError:
             raise HomeAssistantError("Property Settings could not be saved") from None
         return cast("ServiceResponse", settings.to_dict())
 

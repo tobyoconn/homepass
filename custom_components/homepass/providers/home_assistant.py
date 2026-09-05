@@ -46,9 +46,13 @@ class HomeAssistantLockProvider:
         """Dispatch latch retraction separately from Unlock."""
         state = self._hass.states.get(entity_id)
         features = state.attributes.get("supported_features", 0) if state is not None else 0
-        if (state is None or state.state in {STATE_UNKNOWN, STATE_UNAVAILABLE}
-                or not isinstance(features, int) or isinstance(features, bool)
-                or not features & LockEntityFeature.OPEN):
+        if (
+            state is None
+            or state.state in {STATE_UNKNOWN, STATE_UNAVAILABLE}
+            or not isinstance(features, int)
+            or isinstance(features, bool)
+            or not features & LockEntityFeature.OPEN
+        ):
             raise ValueError("Open Door is currently unavailable")
         await self._call("open", entity_id, context)
 

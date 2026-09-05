@@ -184,7 +184,7 @@ class SynchronizationStatusService:
             authority = (
                 None if raw_authority is None else CredentialMetadata.from_dict(raw_authority)
             )
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             grant = None
             metadata = None
             authority = None
