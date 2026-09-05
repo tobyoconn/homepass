@@ -123,6 +123,8 @@ class AccessPointCommandService:
 
         target = await self._access_points.get_target(access_point_id)
         state = await self._access_points.resolve_state(access_point_id)
+        # Discovery can await a provider read; reload consent before dispatch.
+        target = await self._access_points.get_target(access_point_id)
         if (
             operation == SERVICE_UNLOCK
             and origin

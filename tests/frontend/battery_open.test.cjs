@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../custom_components/homepass/frontend/homepass-panel.js'), 'utf8');
 const context = { HTMLElement: class {}, customElements: { get: () => true }, URL, console };
-vm.runInNewContext(source.replace(/^import .*\n/, '').replaceAll('import.meta.url', JSON.stringify('http://localhost/homepass-panel.js')) + '\nglobalThis.Panel = HomePassPanel;', context);
+vm.runInNewContext(source.replace(/^import .*\n/, '').replaceAll('import.meta.url', JSON.stringify('http://localhost/homepass-panel.js')) + '\nglobalThis.Panel = HomePassPanel; globalThis.iconForState = doorStatusIconForState;', context);
 const panel = () => Object.assign(Object.create(context.Panel.prototype), {
   _hass: { states: {} }, _batteryThresholds: { low: 30, critical: 10 },
 });
@@ -90,4 +90,10 @@ test('unlocked is not accepted as a successful latch release', () => {
   assert.equal(completed, 0); assert.equal(failed, 0);
   p._reconcileDoorOperationFromLiveState({ id: 'example', availability: 'available', lock_state: 'open' });
   assert.equal(completed, 1);
+});
+
+
+test('latch state reuses the unlocked symbol without implying the door is physically open', () => {
+  assert.equal(context.iconForState('open', 'closed', 'available'), context.iconForState('unlocked', 'closed', 'available'));
+  assert.notEqual(context.iconForState('open', 'closed', 'available'), context.iconForState('unlocked', 'open', 'available'));
 });

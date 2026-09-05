@@ -215,6 +215,8 @@ function escapeHtml(value) {
 }
 
 function doorStatusIconForState(lockState, doorState, availability) {
+  // A withdrawn latch is unlocked; only the contact sensor determines door position.
+  if (lockState === "open") lockState = "unlocked";
   if (!["available", "online"].includes(availability)) {
     return DOOR_STATUS_ICON_URLS.UNKNOWN;
   }
@@ -245,8 +247,8 @@ function doorStatusAccessibleText(
     jammed: "jammed",
     locked: "locked",
     locking: "locking",
-    open: "open",
-    opening: "opening",
+    open: "latch released",
+    opening: "releasing latch",
     unlocked: "unlocked",
     unlocking: "unlocking",
   };
@@ -11256,8 +11258,8 @@ class HomePassPanel extends HTMLElement {
       jammed: "Jammed",
       locked: "Locked",
       locking: "Locking",
-      open: "Open",
-      opening: "Opening",
+      open: "Latch released",
+      opening: "Releasing latch",
       unlocked: "Unlocked",
       unlocking: "Unlocking",
     };

@@ -262,3 +262,37 @@ def test_policy_fields_are_available_in_admin_schemas():
     payload = {"access_point_id": str(uuid4()), "open_enabled": True, "entry_action": "open"}
     assert ENROLL_ACCESS_POINT_SCHEMA(payload) == payload
     assert UPDATE_ACCESS_POINT_SCHEMA(payload) == payload
+
+
+async def test_consent_is_rechecked_after_state_discovery(hass):
+    target, provider, _, commands = command_fixture(hass)
+    revoked = replace(
+        target, access_point=replace(target.access_point, open_enabled=False, entry_action="unlock")
+    )
+    commands._access_points.get_target.side_effect = [target, revoked]
+    with pytest.raises(ValueError):
+        await commands.execute(
+            target.access_point.id,
+            "open",
+            origin=LockEventOrigin.HOMEPASS_MANUAL,
+            context=Context(),
+        )
+    provider.open.assert_not_awaited()
+
+
+async def test_non_admin_cannot_change_open_permission(hass):
+    from homeassistant.exceptions import ServiceValidationError
+    from custom_components.homepass.access_point_actions import async_register_access_point_actions
+
+    points = AsyncMock()
+    async_register_access_point_actions(hass, points, AsyncMock(), AsyncMock())
+    with pytest.raises(ServiceValidationError, match="administrator"):
+        await hass.services.async_call(
+            "homepass",
+            "update_access_point",
+            {"access_point_id": str(uuid4()), "open_enabled": True, "entry_action": "open"},
+            blocking=True,
+            return_response=True,
+            context=Context(),
+        )
+    points.update_open_policy.assert_not_awaited()
