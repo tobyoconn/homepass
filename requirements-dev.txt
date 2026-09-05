@@ -13,6 +13,6 @@ pyNukiBT==0.0.20
 async-timeout==5.0.1
 
 # Project quality tools and third-party typing.
-mypy==2.3.0
+mypy==2.3.1
 ruff==0.15.20
 types-qrcode
