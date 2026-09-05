@@ -39,9 +39,7 @@ async def test_keypad_audit_event_supplies_exact_physical_unlock_evidence() -> N
     """A successful keypad record is correlated by its lock-assigned code ID."""
     service, physical, fingerprint, _access_point_id = _service()
     occurred_at = datetime.now(UTC)
-    event = ProviderAuditEvent(
-        "51", occurred_at, "unlock", "success", "17", "Ignored", "keypad"
-    )
+    event = ProviderAuditEvent("51", occurred_at, "unlock", "success", "17", "Ignored", "keypad")
 
     await service._process(event)
 

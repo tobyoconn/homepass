@@ -215,6 +215,8 @@ class NfcAccessService:
     async def _operation_for_target(self, access_point_id: UUID) -> tuple[str, str]:
         """Bind a predictable user-facing operation to the short-lived tap."""
         target = await self._access_points.get_target(access_point_id)
+        if target.control_profile == "lock" and target.access_point.entry_action == "open":
+            return SERVICE_UNLOCK, "open"
         if target.control_profile not in {"garage_cover", "garage_toggle"}:
             return SERVICE_UNLOCK, "unlock"
         state = await self._access_points.resolve_state(access_point_id)

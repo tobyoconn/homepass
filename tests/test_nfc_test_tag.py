@@ -36,14 +36,14 @@ async def test_test_tag_requires_passkey_then_dispatches_real_unlock() -> None:
     )
     relationship = SimpleNamespace(
         decision=SimpleNamespace(allowed=True, value="allowed"),
-        access_point=SimpleNamespace(display_name="Test Door"),
+        access_point=SimpleNamespace(display_name="Test Door", entry_action="unlock"),
         person=SimpleNamespace(person_id=uuid4(), display_name="Example Resident"),
     )
     authorization = SimpleNamespace(
         resolve_person_for_access_point=AsyncMock(return_value=relationship)
     )
     target = SimpleNamespace(
-        access_point=SimpleNamespace(display_name="Test Door"),
+        access_point=SimpleNamespace(display_name="Test Door", entry_action="unlock"),
         control_profile="lock",
     )
     access_points = SimpleNamespace(get_target=AsyncMock(return_value=target))
@@ -92,7 +92,7 @@ async def test_revoked_test_tag_cannot_unlock_existing_tap_session() -> None:
         append_audit=AsyncMock(),
     )
     target = SimpleNamespace(
-        access_point=SimpleNamespace(display_name="Test Door"),
+        access_point=SimpleNamespace(display_name="Test Door", entry_action="unlock"),
         control_profile="lock",
     )
     access_points = SimpleNamespace(get_target=AsyncMock(return_value=target))

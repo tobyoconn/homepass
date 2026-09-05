@@ -1,6 +1,6 @@
 [project]
 name = "homepass"
-version = "1.17.5"
+version = "1.18.0"
 description = "People-first access management for Home Assistant"
 requires-python = ">=3.14"
 license = {text = "MIT"}

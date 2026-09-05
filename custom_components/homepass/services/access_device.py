@@ -120,9 +120,7 @@ class AccessDeviceService:
     async def reconcile_pin_capabilities(self) -> None:
         """Restore keypad-backed PIN capability from durable device associations."""
         access_point_ids = {
-            device.access_point_id
-            for device in await self._repository.list_all()
-            if device.enabled
+            device.access_point_id for device in await self._repository.list_all() if device.enabled
         }
         for access_point_id in access_point_ids:
             await self._access_point_service.set_keypad_pin_capable(

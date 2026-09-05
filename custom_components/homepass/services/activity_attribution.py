@@ -98,7 +98,7 @@ class ActivityKeypadAttributionService:
                 or credential.credential_id != metadata.vault_credential_id
             ):
                 return None
-        except (CredentialAuthorityConflictError, KeyError, TypeError, ValueError):
+        except CredentialAuthorityConflictError, KeyError, TypeError, ValueError:
             return None
         return person
 

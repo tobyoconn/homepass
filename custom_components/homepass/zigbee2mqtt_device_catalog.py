@@ -34,7 +34,7 @@ def parse_zigbee2mqtt_device_catalog(payload: str) -> tuple[Zigbee2MqttCatalogDe
         return ()
     try:
         raw = json.loads(payload)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return ()
     if not isinstance(raw, list):
         return ()

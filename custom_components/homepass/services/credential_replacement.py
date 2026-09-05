@@ -863,7 +863,7 @@ class CredentialReplacementLifecycleService:
     ) -> CredentialReplacementDriver | None:
         try:
             return self._driver_resolver(AccessDriver(cast(str, target["driver"])))
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return None
 
     @staticmethod

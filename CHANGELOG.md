@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.18.0] - 2026-09-05
+
+- Added upright dashboard battery indicators for locks, door sensors and accessories, preserving existing door artwork and status markers.
+- Raised low battery to 30%, retained critical at 10%, and repaired alerts for attribute-only battery readings.
+- Added administrator-confirmed Open Door support, Nuki door-fitting recommendations, and separate manual Unlock/Open choices.
+- Applied configured entry actions to HomePASS keypad and NFC requests, and distinguished latch release from physical door opening in Activity.
+- Added backend and executable frontend regression coverage.
+- Normalized Python formatting and added its check to continuous validation.
+
+### Updating
+
+Back up Home Assistant, install this version through HACS and restart Home Assistant.
+Existing doors retain their configured Lock/Unlock behaviour until an administrator
+explicitly enables Open Door in Door behaviour. Native Nuki keypad and fingerprint
+actions continue to follow the Nuki app setting.
+
+See [Battery and entry behaviour](docs/battery-and-entry-behaviour.md) for details.
+
 ## [1.17.5] - 2026-08-27
 
 ### Fixed

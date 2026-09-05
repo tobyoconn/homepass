@@ -43,6 +43,7 @@ class ActivityEventType(StrEnum):
     DOOR_CLOSED = "door_closed"
     DOOR_LOCKED = "door_locked"
     DOOR_UNLOCKED = "door_unlocked"
+    LATCH_RELEASED = "latch_released"
     DOOR_LEFT_OPEN = "door_left_open"
     PIN_FAILED = "pin_failed"
     LOCK_JAMMED = "lock_jammed"
@@ -153,9 +154,9 @@ _NO_ATTRIBUTES: Mapping[str, type[str] | type[int] | type[float] | type[bool]] =
 _LOCK_ATTRIBUTES: Mapping[str, type[str] | type[int] | type[float] | type[bool]] = MappingProxyType(
     {"lock_origin": str}
 )
-_BATTERY_ATTRIBUTES: Mapping[
-    str, type[str] | type[int] | type[float] | type[bool]
-] = MappingProxyType({"battery_percentage": int})
+_BATTERY_ATTRIBUTES: Mapping[str, type[str] | type[int] | type[float] | type[bool]] = (
+    MappingProxyType({"battery_percentage": int})
+)
 
 ACTIVITY_EVENT_DEFINITIONS: Mapping[ActivityEventType, ActivityEventDefinition] = MappingProxyType(
     {
@@ -166,6 +167,9 @@ ACTIVITY_EVENT_DEFINITIONS: Mapping[ActivityEventType, ActivityEventDefinition] 
             ActivityCategory.DOOR, ActivitySeverity.INFO, _NO_ATTRIBUTES
         ),
         ActivityEventType.DOOR_LOCKED: ActivityEventDefinition(
+            ActivityCategory.DOOR, ActivitySeverity.INFO, _LOCK_ATTRIBUTES
+        ),
+        ActivityEventType.LATCH_RELEASED: ActivityEventDefinition(
             ActivityCategory.DOOR, ActivitySeverity.INFO, _LOCK_ATTRIBUTES
         ),
         ActivityEventType.DOOR_UNLOCKED: ActivityEventDefinition(
@@ -297,6 +301,7 @@ _DOOR_REQUIRED = {
     ActivityEventType.DOOR_CLOSED,
     ActivityEventType.DOOR_LOCKED,
     ActivityEventType.DOOR_UNLOCKED,
+    ActivityEventType.LATCH_RELEASED,
     ActivityEventType.DOOR_LEFT_OPEN,
     ActivityEventType.PIN_FAILED,
     ActivityEventType.LOCK_JAMMED,
@@ -703,4 +708,3 @@ __all__ = [
     "LockEventOrigin",
     "activity_event_definition",
 ]
-

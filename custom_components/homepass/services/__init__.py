@@ -294,4 +294,3 @@ __all__ = [
     "parse_zigbee2mqtt_keypad_command",
     "WeeklyHoursKind",
 ]
-

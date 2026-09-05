@@ -245,7 +245,7 @@ class PersonDeletionService:
     def _driver(self, target: dict[str, LifecyclePayloadValue]) -> CredentialRemovalDriver | None:
         try:
             return self._driver_resolver(AccessDriver(cast(str, target["driver"])))
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return None
 
     @staticmethod

@@ -1,6 +1,8 @@
 """Home Assistant adapter for truthful Access Point operational state."""
 
 from datetime import datetime
+from collections.abc import Awaitable, Callable
+from homeassistant.components.lock import LockEntityFeature
 from typing import Final
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
@@ -37,13 +39,35 @@ _CURRENT_DOOR_STATUS_MARKERS: Final = (
 class HomeAssistantAccessPointStateResolver:
     """Project current lock and same-device contact state without leaking identifiers."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        *,
+        nuki_entity_id: str | None = None,
+        nuki_entry_recommendation: Callable[[], Awaitable[str | None]] | None = None,
+    ) -> None:
         """Initialize the Home Assistant state adapter."""
         self._hass = hass
+        self._nuki_entity_id = nuki_entity_id
+        self._nuki_entry_recommendation = nuki_entry_recommendation
 
     async def resolve_state(self, target: AccessPointTarget) -> AccessPointState:
         """Resolve known lock, availability, and associated contact states."""
         lock = self._hass.states.get(target.lock_entity_id)
+        features = lock.attributes.get("supported_features", 0) if lock is not None else 0
+        supports_open = (
+            target.control_profile == "lock"
+            and isinstance(features, int)
+            and not isinstance(features, bool)
+            and bool(features & LockEntityFeature.OPEN)
+        )
+        recommendation = None
+        if (
+            supports_open
+            and target.lock_entity_id == self._nuki_entity_id
+            and self._nuki_entry_recommendation
+        ):
+            recommendation = await self._nuki_entry_recommendation()
         if target.status_entity_id is not None:
             door_state, door_entity_id, door_last_updated = self._resolve_explicit_status(
                 target.status_entity_id, target.status_inverted
@@ -78,6 +102,8 @@ class HomeAssistantAccessPointStateResolver:
             return AccessPointState(
                 availability,
                 lock_state=lock_state,
+                supports_open=supports_open,
+                recommended_entry_action=recommendation,
                 door_state=door_state,
                 last_updated=last_updated,
                 lock_entity_id=target.lock_entity_id,
@@ -205,4 +231,3 @@ class HomeAssistantAccessPointStateResolver:
                 )
             )
         return min(candidates)[1] if candidates else None
-

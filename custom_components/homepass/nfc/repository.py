@@ -102,9 +102,7 @@ class NfcAccessRepository:
                 raise NfcRepositoryError("NFC test tag is disabled or expired")
             return tag
 
-    async def active_test_tag_for_access_point(
-        self, access_point_id: UUID
-    ) -> NfcTestTag | None:
+    async def active_test_tag_for_access_point(self, access_point_id: UUID) -> NfcTestTag | None:
         """Return one active test tag for a Door without exposing its URL token."""
         async with self._lock:
             for raw in self._require_data()["test_tags"].values():
@@ -115,9 +113,7 @@ class NfcAccessRepository:
                     return tag
             return None
 
-    async def test_tag_hash_is_active(
-        self, token_hash: str, access_point_id: UUID
-    ) -> bool:
+    async def test_tag_hash_is_active(self, token_hash: str, access_point_id: UUID) -> bool:
         """Recheck a test tag at unlock time so revocation takes effect immediately."""
         async with self._lock:
             raw = self._require_data()["test_tags"].get(token_hash)
@@ -155,9 +151,7 @@ class NfcAccessRepository:
                     counts[tag.access_point_id] = counts.get(tag.access_point_id, 0) + 1
             return counts
 
-    async def list_tags_for_access_point(
-        self, access_point_id: UUID
-    ) -> tuple[NfcTag, ...]:
+    async def list_tags_for_access_point(self, access_point_id: UUID) -> tuple[NfcTag, ...]:
         """Return registered tags for one Door without exposing their AES keys."""
         async with self._lock:
             tags = (
@@ -165,10 +159,12 @@ class NfcAccessRepository:
                 for raw in self._require_data()["tags"].values()
                 if isinstance(raw, dict)
             )
-            return tuple(sorted(
-                (tag for tag in tags if tag.access_point_id == access_point_id),
-                key=lambda tag: (not tag.enabled, tag.created_at, tag.uid_hex),
-            ))
+            return tuple(
+                sorted(
+                    (tag for tag in tags if tag.access_point_id == access_point_id),
+                    key=lambda tag: (not tag.enabled, tag.created_at, tag.uid_hex),
+                )
+            )
 
     async def revoke_tag(self, public_id: str, access_point_id: UUID) -> NfcTag:
         """Disable one physical tag while retaining its non-secret audit record."""
@@ -234,10 +230,18 @@ class NfcAccessRepository:
                 raise NfcRepositoryError("NFC tag is disabled")
             if tag.last_counter is not None and counter <= tag.last_counter:
                 raise NfcRepositoryError("NFC tap was already used")
-            updated = NfcTag(tag.public_id, tag.uid_hex, tag.access_point_id,
-                             tag.meta_key_credential_id, tag.file_key_credential_id,
-                             tag.enabled, counter, tag.created_at,
-                             tag.admin_key_credential_id, tag.write_protected)
+            updated = NfcTag(
+                tag.public_id,
+                tag.uid_hex,
+                tag.access_point_id,
+                tag.meta_key_credential_id,
+                tag.file_key_credential_id,
+                tag.enabled,
+                counter,
+                tag.created_at,
+                tag.admin_key_credential_id,
+                tag.write_protected,
+            )
             data["tags"][public_id] = updated.to_dict()
             await self._store.async_save(data)
             self._data = data
@@ -256,19 +260,23 @@ class NfcAccessRepository:
             if tag.access_point_id != access_point_id:
                 raise NfcRepositoryError("NFC tag is not registered to this Door")
             updated = NfcTag(
-                tag.public_id, tag.uid_hex, tag.access_point_id,
-                tag.meta_key_credential_id, tag.file_key_credential_id,
-                tag.enabled, tag.last_counter, tag.created_at,
-                credential_id, tag.write_protected,
+                tag.public_id,
+                tag.uid_hex,
+                tag.access_point_id,
+                tag.meta_key_credential_id,
+                tag.file_key_credential_id,
+                tag.enabled,
+                tag.last_counter,
+                tag.created_at,
+                credential_id,
+                tag.write_protected,
             )
             data["tags"][public_id] = updated.to_dict()
             await self._store.async_save(data)
             self._data = data
             return updated
 
-    async def confirm_tag_write_protected(
-        self, public_id: str, access_point_id: UUID
-    ) -> NfcTag:
+    async def confirm_tag_write_protected(self, public_id: str, access_point_id: UUID) -> NfcTag:
         """Record an administrator-confirmed successful protected encoding."""
         async with self._lock:
             data = deepcopy(self._require_data())
@@ -281,10 +289,16 @@ class NfcAccessRepository:
             if tag.admin_key_credential_id is None:
                 raise NfcRepositoryError("NFC tag has no administrator key")
             updated = NfcTag(
-                tag.public_id, tag.uid_hex, tag.access_point_id,
-                tag.meta_key_credential_id, tag.file_key_credential_id,
-                tag.enabled, None, tag.created_at,
-                tag.admin_key_credential_id, True,
+                tag.public_id,
+                tag.uid_hex,
+                tag.access_point_id,
+                tag.meta_key_credential_id,
+                tag.file_key_credential_id,
+                tag.enabled,
+                None,
+                tag.created_at,
+                tag.admin_key_credential_id,
+                True,
             )
             data["tags"][public_id] = updated.to_dict()
             await self._store.async_save(data)
@@ -308,8 +322,7 @@ class NfcAccessRepository:
                 raise NfcRepositoryError("Enrollment invitation is expired or already used")
             return invite
 
-    async def complete_enrollment(self, raw_token: str,
-                                  credential: PasskeyCredential) -> None:
+    async def complete_enrollment(self, raw_token: str, credential: PasskeyCredential) -> None:
         """Consume an invite and add its passkey in one durable mutation."""
         async with self._lock:
             data = deepcopy(self._require_data())
@@ -324,19 +337,29 @@ class NfcAccessRepository:
                 raise NfcRepositoryError("Passkey is already enrolled")
             data["credentials"][credential.credential_id] = credential.to_dict()
             data["invites"][token_hash] = EnrollmentInvite(
-                invite.token_hash, invite.person_id, invite.person_name,
-                invite.expires_at, utcnow(), invite.created_at).to_dict()
+                invite.token_hash,
+                invite.person_id,
+                invite.person_name,
+                invite.expires_at,
+                utcnow(),
+                invite.created_at,
+            ).to_dict()
             await self._store.async_save(data)
             self._data = data
 
     async def list_credentials_for_person(self, person_id: UUID) -> tuple[PasskeyCredential, ...]:
         async with self._lock:
-            items = (PasskeyCredential.from_dict(raw)
-                     for raw in self._require_data()["credentials"].values()
-                     if isinstance(raw, dict))
-            return tuple(sorted((item for item in items
-                                 if item.person_id == person_id and item.enabled),
-                                key=lambda item: item.credential_id))
+            items = (
+                PasskeyCredential.from_dict(raw)
+                for raw in self._require_data()["credentials"].values()
+                if isinstance(raw, dict)
+            )
+            return tuple(
+                sorted(
+                    (item for item in items if item.person_id == person_id and item.enabled),
+                    key=lambda item: item.credential_id,
+                )
+            )
 
     async def get_credential(self, credential_id: str) -> PasskeyCredential:
         async with self._lock:
@@ -403,9 +426,7 @@ class NfcAccessRepository:
             grant = NfcAccessGrant.from_dict(raw)
             return grant.person_id == person_id and grant.access_point_id == access_point_id
 
-    async def list_access_grants_for_person(
-        self, person_id: UUID
-    ) -> tuple[NfcAccessGrant, ...]:
+    async def list_access_grants_for_person(self, person_id: UUID) -> tuple[NfcAccessGrant, ...]:
         """Return explicit NFC assignments for one Person."""
         async with self._lock:
             grants = tuple(
@@ -431,9 +452,15 @@ class NfcAccessRepository:
                 item = PasskeyCredential.from_dict(raw)
                 if item.person_id == person_id and item.enabled:
                     data["credentials"][key] = PasskeyCredential(
-                        item.credential_id, item.person_id, item.public_key,
-                        item.sign_count, item.device_type, item.backed_up, False,
-                        item.created_at).to_dict()
+                        item.credential_id,
+                        item.person_id,
+                        item.public_key,
+                        item.sign_count,
+                        item.device_type,
+                        item.backed_up,
+                        False,
+                        item.created_at,
+                    ).to_dict()
                     changed += 1
             for key, raw in tuple(data["invites"].items()):
                 if not isinstance(raw, dict):
@@ -465,10 +492,17 @@ class NfcAccessRepository:
                 item = NfcTag.from_dict(raw)
                 if item.access_point_id == access_point_id and item.enabled:
                     data["tags"][key] = NfcTag(
-                        item.public_id, item.uid_hex, item.access_point_id,
-                        item.meta_key_credential_id, item.file_key_credential_id,
-                        False, item.last_counter, item.created_at,
-                        item.admin_key_credential_id, item.write_protected).to_dict()
+                        item.public_id,
+                        item.uid_hex,
+                        item.access_point_id,
+                        item.meta_key_credential_id,
+                        item.file_key_credential_id,
+                        False,
+                        item.last_counter,
+                        item.created_at,
+                        item.admin_key_credential_id,
+                        item.write_protected,
+                    ).to_dict()
                     changed += 1
             for key, raw in tuple(data["test_tags"].items()):
                 if not isinstance(raw, dict):
@@ -499,22 +533,43 @@ class NfcAccessRepository:
             if sign_count < item.sign_count:
                 raise NfcRepositoryError("Passkey signature counter moved backwards")
             data["credentials"][credential_id] = PasskeyCredential(
-                item.credential_id, item.person_id, item.public_key, sign_count,
-                item.device_type, item.backed_up, item.enabled, item.created_at).to_dict()
+                item.credential_id,
+                item.person_id,
+                item.public_key,
+                sign_count,
+                item.device_type,
+                item.backed_up,
+                item.enabled,
+                item.created_at,
+            ).to_dict()
             await self._store.async_save(data)
             self._data = data
 
-    async def append_audit(self, *, occurred_at: datetime, outcome: str,
-                           access_point_id: str, person_id: str | None,
-                           reason: str, counter: int | None,
-                           test_mode: bool = False) -> None:
+    async def append_audit(
+        self,
+        *,
+        occurred_at: datetime,
+        outcome: str,
+        access_point_id: str,
+        person_id: str | None,
+        reason: str,
+        counter: int | None,
+        test_mode: bool = False,
+    ) -> None:
         async with self._lock:
             data = deepcopy(self._require_data())
             audit = cast(list[dict[str, Any]], data["audit"])
-            audit.append({"occurred_at": occurred_at.isoformat(), "outcome": outcome,
-                          "access_point_id": access_point_id, "person_id": person_id,
-                          "reason": reason, "counter": counter,
-                          "test_mode": test_mode})
+            audit.append(
+                {
+                    "occurred_at": occurred_at.isoformat(),
+                    "outcome": outcome,
+                    "access_point_id": access_point_id,
+                    "person_id": person_id,
+                    "reason": reason,
+                    "counter": counter,
+                    "test_mode": test_mode,
+                }
+            )
             del audit[:-_MAX_AUDIT_RECORDS]
             await self._store.async_save(data)
             self._data = data
@@ -529,7 +584,12 @@ class NfcAccessRepository:
         if "test_tags" not in migrated:
             migrated["test_tags"] = {}
         if set(migrated) != {
-            "tags", "test_tags", "credentials", "invites", "access_grants", "audit"
+            "tags",
+            "test_tags",
+            "credentials",
+            "invites",
+            "access_grants",
+            "audit",
         }:
             raise NfcRepositoryError("NFC storage has an invalid schema")
         if not all(
@@ -543,9 +603,7 @@ class NfcAccessRepository:
             if not isinstance(record, dict):
                 raise NfcRepositoryError("NFC access grant is invalid")
             grant = NfcAccessGrant.from_dict(record)
-            if key != NfcAccessRepository._grant_key(
-                grant.person_id, grant.access_point_id
-            ):
+            if key != NfcAccessRepository._grant_key(grant.person_id, grant.access_point_id):
                 raise NfcRepositoryError("NFC access grant key is invalid")
         for key, record in migrated["test_tags"].items():
             if not isinstance(record, dict):

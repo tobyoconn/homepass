@@ -229,7 +229,7 @@ class AccessMetadataRepository:
         try:
             storage = await self._storage_manager.async_load()
             return storage, self._deserialize_records(storage)
-        except (CredentialSlotIntegrityError, StorageError):
+        except CredentialSlotIntegrityError, StorageError:
             raise
         except Exception as err:
             raise StorageError("Unable to load HomePASS access metadata") from err
@@ -242,7 +242,7 @@ class AccessMetadataRepository:
         try:
             async with self._lock:
                 return await self._storage_manager.async_transaction(mutator)
-        except (CredentialSlotIntegrityError, StorageError):
+        except CredentialSlotIntegrityError, StorageError:
             raise
         except Exception as err:
             raise StorageError("Unable to save HomePASS access metadata") from err

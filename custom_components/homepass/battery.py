@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 _BATTERY_DEVICE_CLASS = "battery"
 _BATTERY_ATTRIBUTES = ("battery_level", "battery_percentage", "battery")
-LOW_BATTERY_PERCENTAGE = 20
+LOW_BATTERY_PERCENTAGE = 30
 CRITICAL_BATTERY_PERCENTAGE = 10
 
 
@@ -83,7 +83,7 @@ def resolve_device_battery(hass: HomeAssistant, device_id: str) -> BatteryReadin
             continue
         reading = read_battery_source(hass, entry.entity_id)
         if reading is None:
-            continue
+            reading = BatteryReading(entry.entity_id, None, BatteryStatus.UNKNOWN)
         candidates.append(
             (
                 (
@@ -144,11 +144,11 @@ def _percentage(value: object) -> int | None:
         return None
     try:
         numeric = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not 0 <= numeric <= 100:
         return None
-    return round(numeric)
+    return int(numeric + 0.5)
 
 
 __all__ = [

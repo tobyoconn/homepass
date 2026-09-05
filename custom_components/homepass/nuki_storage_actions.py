@@ -77,17 +77,14 @@ async def _load_status(
     managed_ids = {
         str(record.slot)
         for record in await metadata_service.list_all()
-        if record.driver is AccessDriver.NUKI
-        and record.lock_entity_id == lock_entity_id
+        if record.driver is AccessDriver.NUKI and record.lock_entity_id == lock_entity_id
     }
     entries = [
         {
             "nuki_id": record.external_id,
             "name": record.display_name,
             "enabled": record.enabled,
-            "management": (
-                "homepass" if record.external_id in managed_ids else "existing"
-            ),
+            "management": ("homepass" if record.external_id in managed_ids else "existing"),
         }
         for record in records
     ]

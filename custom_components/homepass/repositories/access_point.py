@@ -41,7 +41,7 @@ class AccessPointRepository:
             async with self._lock:
                 snapshot = await self._storage_manager.async_load()
                 return self.get_from_snapshot(snapshot, access_point_id)
-        except (AccessPointNotFoundError, StorageError):
+        except AccessPointNotFoundError, StorageError:
             raise
         except Exception as err:
             raise StorageError("Unable to load HomePASS Access Point") from err
@@ -187,7 +187,7 @@ class AccessPointRepository:
         try:
             async with self._lock:
                 return await self._storage_manager.async_transaction(mutator)
-        except (AccessPointNotFoundError, AccessPointPolicyInUseError, StorageError):
+        except AccessPointNotFoundError, AccessPointPolicyInUseError, StorageError:
             raise
         except Exception as err:
             raise StorageError("Unable to save HomePASS Access Point") from err

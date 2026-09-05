@@ -190,11 +190,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: HomePassConfigEntry) -> 
     nuki_enabled = bool(entry.options.get(CONF_NUKI_ENABLED, False))
     nuki_lock_entity_id = str(entry.options.get(CONF_NUKI_LOCK_ENTITY_ID, "")).strip()
     nuki_authorization_provider: NukiLocalAuthorizationProvider | None = None
+    nuki_transport: NukiBluetoothTransport | None = None
     if nuki_enabled:
         nuki_address = str(entry.options.get(CONF_NUKI_BLE_ADDRESS, "")).strip()
-        credential_id = str(
-            entry.options.get(CONF_NUKI_BLE_CREDENTIAL_ID, "")
-        ).strip()
+        credential_id = str(entry.options.get(CONF_NUKI_BLE_CREDENTIAL_ID, "")).strip()
         try:
             pairing_material = await credential_vault.retrieve(
                 VaultCredentialId.from_string(credential_id)
@@ -204,13 +203,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: HomePassConfigEntry) -> 
                 nuki_address,
                 NukiBluetoothCredential.deserialize(pairing_material),
             )
-            nuki_authorization_provider = NukiLocalAuthorizationProvider(
-                nuki_transport
-            )
+            nuki_authorization_provider = NukiLocalAuthorizationProvider(nuki_transport)
             authorization_provider_registry.register(
                 AccessDriver.NUKI.value, nuki_authorization_provider
             )
-        except (ValueError, VaultError):
+        except ValueError, VaultError:
             _LOGGER.error(
                 "Nuki local access is enabled but its encrypted pairing is unavailable; "
                 "re-pair Nuki in HomePASS integration options"
@@ -258,13 +255,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: HomePassConfigEntry) -> 
 
     access_point_service = AccessPointService(
         name_resolver=HomeAssistantAccessPointNameResolver(hass),
-        state_resolver=HomeAssistantAccessPointStateResolver(hass),
+        state_resolver=HomeAssistantAccessPointStateResolver(
+            hass,
+            nuki_entity_id=nuki_lock_entity_id,
+            nuki_entry_recommendation=(
+                nuki_transport.entry_recommendation if nuki_transport else None
+            ),
+        ),
         target_discovery=HomeAssistantAccessPointDiscovery(
             hass,
             nuki_authorization_entity_id=(
-                nuki_lock_entity_id
-                if nuki_authorization_provider is not None
-                else None
+                nuki_lock_entity_id if nuki_authorization_provider is not None else None
             ),
         ),
         enrollment_store=AccessPointEnrollmentRepository(storage),
@@ -591,15 +592,14 @@ async def _async_register_entry_surfaces(
 ) -> None:
     """Register every action and view before starting background listeners."""
     runtime = entry.runtime_data
-    hass.services.async_register(
-        DOMAIN, SERVICE_PING, handle_ping, schema=vol.Schema({})
-    )
+    hass.services.async_register(DOMAIN, SERVICE_PING, handle_ping, schema=vol.Schema({}))
     async_register_access_point_actions(
         hass,
         runtime.access_point_service,
         runtime.door_details_service,
         runtime.access_point_command_service,
         runtime.nfc_repository,
+        runtime.access_device_service,
     )
     async_register_access_device_actions(hass, runtime.access_device_service)
     async_register_about_action(hass, runtime.about_service)
@@ -633,17 +633,13 @@ async def _async_register_entry_surfaces(
     )
     async_register_person_schedule_actions(hass, runtime.person_schedule_service)
     async_register_policy_explanation_actions(hass, runtime.policy_explanation_service)
-    async_register_synchronization_recovery_action(
-        hass, runtime.synchronization_recovery_service
-    )
+    async_register_synchronization_recovery_action(hass, runtime.synchronization_recovery_service)
     async_register_user_setup_actions(hass, runtime.user_setup_service)
     async_register_schedule_actions(hass, runtime.schedule_service)
     async_register_zwave_spike_actions(hass, runtime.zwave_pin_sync_service)
     async_register_vault_crypto_spike_action(hass)
     async_register_reveal_websocket(hass, runtime.credential_reveal_service)
-    async_register_credential_replacement_websocket(
-        hass, runtime.credential_replacement_service
-    )
+    async_register_credential_replacement_websocket(hass, runtime.credential_replacement_service)
     if (
         runtime.nfc_repository is not None
         and runtime.nfc_webauthn_service is not None
@@ -667,9 +663,7 @@ async def _async_register_entry_surfaces(
     await async_register_homepass_panel(hass)
 
 
-def _unregister_entry_surfaces(
-    hass: HomeAssistant, entry: HomePassConfigEntry
-) -> None:
+def _unregister_entry_surfaces(hass: HomeAssistant, entry: HomePassConfigEntry) -> None:
     """Best-effort remove surfaces after normal unload or partial setup."""
     if entry.runtime_data.nfc_access_service is not None:
         async_unregister_nfc_actions(hass)

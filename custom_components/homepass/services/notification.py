@@ -120,9 +120,7 @@ def format_notification(
     door = activity.door_name or "Door"
     person = activity.person_name or "User"
     battery_percentage = activity.attributes.get("battery_percentage")
-    battery_suffix = (
-        f" ({battery_percentage}%)" if isinstance(battery_percentage, int) else ""
-    )
+    battery_suffix = f" ({battery_percentage}%)" if isinstance(battery_percentage, int) else ""
     event = definition.event
     messages = {
         NotificationEvent.DOOR_PIN_UNLOCKED: (
@@ -169,9 +167,7 @@ def format_notification(
         NotificationEvent.DOOR_OFFLINE: f"{door} is offline.",
         NotificationEvent.DOOR_BACK_ONLINE: f"{door} is back online.",
         NotificationEvent.BATTERY_LOW: f"{door} battery is low{battery_suffix}.",
-        NotificationEvent.BATTERY_CRITICAL: (
-            f"{door} battery is critically low{battery_suffix}."
-        ),
+        NotificationEvent.BATTERY_CRITICAL: (f"{door} battery is critically low{battery_suffix}."),
         NotificationEvent.UNKNOWN_PIN_ATTEMPT: f"Unknown PIN entered at {door}.",
         NotificationEvent.REPEATED_INVALID_PIN_ATTEMPTS: (
             f"Repeated invalid PIN attempts at {door}."
@@ -188,4 +184,3 @@ __all__ = [
     "NotificationMessage",
     "format_notification",
 ]
-

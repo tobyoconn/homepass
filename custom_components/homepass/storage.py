@@ -35,9 +35,7 @@ _TRANSACTION_ACTIVE: ContextVar[bool] = ContextVar(
 
 _MANAGED_ACCESS_POINTS_SETTING = "managed_access_points"
 _ACCESS_POINT_NAME_FALLBACKS_SETTING = "access_point_name_fallbacks"
-_NOTIFICATION_PREFERENCES_RECOVERY_BACKUP_SETTING = (
-    "notification_preferences_recovery_backup"
-)
+_NOTIFICATION_PREFERENCES_RECOVERY_BACKUP_SETTING = "notification_preferences_recovery_backup"
 _LOGGER = logging.getLogger(__name__)
 _LEGACY_ACCESS_POINT_ID = "00000000-0000-4000-8000-000000000001"
 _LEGACY_ACCESS_POINT_DISPLAY_NAME = "Lock"
@@ -281,12 +279,10 @@ def _validate_managed_access_points(settings: dict[str, object]) -> dict[str, ob
             or not (record["discovery_key"] is None or isinstance(record["discovery_key"], str))
             or not isinstance(record["managed"], bool)
             or not (
-                record["control_entity_id"] is None
-                or isinstance(record["control_entity_id"], str)
+                record["control_entity_id"] is None or isinstance(record["control_entity_id"], str)
             )
             or not (
-                record["status_entity_id"] is None
-                or isinstance(record["status_entity_id"], str)
+                record["status_entity_id"] is None or isinstance(record["status_entity_id"], str)
             )
             or record["control_profile"]
             not in {"lock", "garage_cover", "garage_toggle", "electric_strike"}
@@ -370,7 +366,10 @@ def _validate_domain_snapshot(raw: object) -> HomePassStorageData:
 
         access_points: dict[UUID, AccessPoint] = {}
         for stored_id, record in snapshot["data"]["access_points"].items():
-            if set(record) != _ACCESS_POINT_RECORD_FIELDS:
+            if set(record) not in (
+                _ACCESS_POINT_RECORD_FIELDS,
+                _ACCESS_POINT_RECORD_FIELDS | {"open_enabled", "entry_action"},
+            ):
                 raise ValueError("Stored Access Point contains unexpected fields")
             access_point = AccessPoint.from_dict(record)
             if str(access_point.id) != stored_id:
@@ -573,7 +572,7 @@ def _validate_domain_snapshot(raw: object) -> HomePassStorageData:
                 notification_preferences = NotificationPreferences.migrate_dict(
                     raw_notification_preferences
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 settings = snapshot["data"]["settings"]
                 settings.setdefault(
                     _NOTIFICATION_PREFERENCES_RECOVERY_BACKUP_SETTING,

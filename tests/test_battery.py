@@ -39,8 +39,8 @@ _FRONTEND = (
 
 def test_battery_percentage_thresholds_are_explicit() -> None:
     assert status_for_percentage(100) is BatteryStatus.NORMAL
-    assert status_for_percentage(21) is BatteryStatus.NORMAL
-    assert status_for_percentage(20) is BatteryStatus.LOW
+    assert status_for_percentage(31) is BatteryStatus.NORMAL
+    assert status_for_percentage(30) is BatteryStatus.LOW
     assert status_for_percentage(11) is BatteryStatus.LOW
     assert status_for_percentage(10) is BatteryStatus.CRITICAL
     assert status_for_percentage(0) is BatteryStatus.CRITICAL
@@ -146,3 +146,73 @@ def test_doors_and_devices_frontend_presents_supported_batteries() -> None:
     assert 'class="device-battery' in source
     assert '"mdi:battery-alert"' in source
     assert 'status === "critical" ? "critical"' in source
+
+
+async def test_attribute_battery_escalation_is_monitored_and_recovery_rearms(hass):
+    """A displayed lock attribute must also drive alerts, without repeated low events."""
+    point = AccessPoint(display_name="Example Door")
+    points = MagicMock()
+    points.list_access_point_summaries = AsyncMock(
+        return_value=(
+            AccessPointSummary(
+                point,
+                AccessPointState(
+                    AccessPointAvailability.AVAILABLE, battery_entity_id="lock.example"
+                ),
+            ),
+        )
+    )
+    points.add_change_listener.return_value = lambda: None
+    devices = MagicMock()
+    devices.list_views = AsyncMock(return_value=())
+    activity = AsyncMock()
+    hass.states.async_set("lock.example", "locked", {"battery_level": 55})
+    service = BatteryMonitoringService(hass, points, devices, activity)
+    await service.async_start()
+    await hass.async_block_till_done()
+    for value in (30, 29, 20, 11):
+        hass.states.async_set("lock.example", "locked", {"battery_level": value})
+        await hass.async_block_till_done()
+    assert activity.record.await_count == 1
+    assert activity.record.await_args.args[0].attributes == {"battery_percentage": 30}
+    hass.states.async_set("lock.example", "locked", {"battery_level": 10})
+    await hass.async_block_till_done()
+    assert activity.record.await_count == 2
+    for value in (80, 30):
+        hass.states.async_set("lock.example", "locked", {"battery_level": value})
+        await hass.async_block_till_done()
+    assert activity.record.await_count == 3
+    await service.async_stop()
+
+
+async def test_known_battery_without_state_is_preserved_as_unknown(hass, mock_config_entry):
+    mock_config_entry.add_to_hass(hass)
+    device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=mock_config_entry.entry_id, identifiers={("battery_test", "missing-state")}
+    )
+    registry = er.async_get(hass)
+    lock = registry.async_get_or_create(
+        "lock", "battery_test", "missing-state-lock", device_id=device.id
+    )
+    battery = registry.async_get_or_create(
+        "sensor",
+        "battery_test",
+        "missing-state-battery",
+        device_id=device.id,
+        original_device_class="battery",
+    )
+    reading = resolve_entity_battery(hass, lock.entity_id)
+    assert reading.entity_id == battery.entity_id
+    assert reading.status is BatteryStatus.UNKNOWN
+    assert reading.percentage is None
+
+
+async def test_binary_battery_and_fractional_boundaries(hass):
+    from custom_components.homepass.battery import read_battery_source
+
+    hass.states.async_set("binary_sensor.example_battery", "on", {"device_class": "battery"})
+    reading = read_battery_source(hass, "binary_sensor.example_battery")
+    assert reading.status is BatteryStatus.LOW
+    assert reading.percentage is None
+    hass.states.async_set("sensor.example_battery", "30.5", {"device_class": "battery"})
+    assert read_battery_source(hass, "sensor.example_battery").status is BatteryStatus.NORMAL

@@ -308,9 +308,7 @@ class NukiFingerprintService:
         return await self.status_for_person(person_id)
 
     @staticmethod
-    def _matches_authorization(
-        record: NukiFingerprintEnrollment, metadata: AccessMetadata
-    ) -> bool:
+    def _matches_authorization(record: NukiFingerprintEnrollment, metadata: AccessMetadata) -> bool:
         """Require both the current Nuki ID and the current access lifecycle."""
         return (
             record.authorization_external_id == str(metadata.slot)

@@ -95,6 +95,8 @@ class AccessPointState:
     door_sensor_battery_percentage: int | None = None
     door_sensor_battery_status: str | None = None
     door_sensor_battery_entity_id: str | None = None
+    supports_open: bool = False
+    recommended_entry_action: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +137,8 @@ class AccessPointSummary:
             data["door_sensor_battery_percentage"] = self.state.door_sensor_battery_percentage
         if self.state.door_sensor_battery_entity_id is not None:
             data["door_sensor_battery_entity_id"] = self.state.door_sensor_battery_entity_id
+        data["supports_open"] = self.state.supports_open
+        data["recommended_entry_action"] = self.state.recommended_entry_action
         data["control_profile"] = self.control_profile
         data["capabilities"] = {
             "app": True,
@@ -363,7 +367,13 @@ class AccessPointService:
         ]
         return await self._summaries(tuple(available))
 
-    async def enroll_access_point(self, access_point_id: UUID) -> AccessPointSummary:
+    async def enroll_access_point(
+        self,
+        access_point_id: UUID,
+        *,
+        open_enabled: bool | None = None,
+        entry_action: str = "unlock",
+    ) -> AccessPointSummary:
         """Persist one currently compatible discovered lock as managed."""
         operation_id = uuid4()
         targets = await self._discovered_targets()
@@ -420,6 +430,10 @@ class AccessPointService:
             else:
                 policy = retained
             resolved = replace(resolved, access_point=policy)
+        state = await self._state_resolver.resolve_state(resolved) if self._state_resolver else None
+        self._validate_open_policy(state, open_enabled, entry_action, onboarding=True)
+        policy = replace(policy, open_enabled=bool(open_enabled), entry_action=entry_action)
+        resolved = replace(resolved, access_point=policy)
         await self._enrollment_store.upsert(
             enrollment,
             policy,
@@ -448,6 +462,8 @@ class AccessPointService:
         device_id: str | None = None,
         status_inverted: bool = False,
         pulse_seconds: float = 1.0,
+        open_enabled: bool | None = None,
+        entry_action: str = "unlock",
     ) -> AccessPointSummary:
         """Persist an administrator-selected Home Assistant device binding."""
         if self._enrollment_store is None or self._policy_store is None:
@@ -513,6 +529,10 @@ class AccessPointService:
             device_id=device_id,
         )
         target = self._target_from_enrollment(enrollment, policy)
+        state = await self._state_resolver.resolve_state(target) if self._state_resolver else None
+        self._validate_open_policy(state, open_enabled, entry_action, onboarding=True)
+        policy = replace(policy, open_enabled=bool(open_enabled), entry_action=entry_action)
+        target = replace(target, access_point=policy)
         await self._enrollment_store.upsert(
             enrollment,
             policy,
@@ -594,6 +614,48 @@ class AccessPointService:
         if name_changed or enabled_changed:
             await self._notify_change_listeners()
         return saved
+
+    @staticmethod
+    def _validate_open_policy(
+        state: AccessPointState | None,
+        open_enabled: bool | None,
+        entry_action: str,
+        *,
+        onboarding: bool = False,
+    ) -> None:
+        supports_open = state is not None and state.supports_open is True
+        if onboarding and supports_open and open_enabled is None:
+            raise ValueError("Confirm whether HomePASS should enable Open Door")
+        if open_enabled is not None and not isinstance(open_enabled, bool):
+            raise ValueError("Open permission must be a boolean")
+        if open_enabled and not supports_open:
+            raise ValueError("This lock does not currently support Open Door")
+        if entry_action not in {"unlock", "open"} or (entry_action == "open" and not open_enabled):
+            raise ValueError("Open Door must be enabled before using it for entry")
+
+    async def update_open_policy(
+        self,
+        access_point_id: UUID,
+        *,
+        open_enabled: bool,
+        entry_action: str,
+    ) -> AccessPointSummary:
+        """Persist administrator-confirmed entry policy without changing Nuki settings."""
+        if self._policy_store is None:
+            raise ValueError("Access Point policy persistence is unavailable")
+        target = await self.get_target(access_point_id)
+        state = await self.resolve_state(access_point_id)
+        self._validate_open_policy(state, open_enabled, entry_action)
+        current = await self._policy_store.get(access_point_id)
+        updated = replace(
+            current,
+            open_enabled=open_enabled,
+            entry_action=entry_action,
+            updated_at=max(datetime.now(UTC), current.updated_at),
+        )
+        await self._policy_store.update(updated, expected_updated_at=current.updated_at)
+        await self._notify_change_listeners()
+        return await self._summary(replace(target, access_point=updated))
 
     async def update_access_point_status(
         self,
@@ -741,9 +803,7 @@ class AccessPointService:
             else frozenset()
         )
         discovered_targets = await self._discovered_targets()
-        discovered_by_entity = {
-            target.lock_entity_id: target for target in discovered_targets
-        }
+        discovered_by_entity = {target.lock_entity_id: target for target in discovered_targets}
         configured_by_entity = {target.lock_entity_id: target for target in self._targets}
         reconciled: list[AccessPointTarget] = []
         seen_ids: set[UUID] = set()
@@ -948,4 +1008,3 @@ class AccessPointService:
             target,
             access_point=replace(target.access_point, display_name=display_name),
         )
-

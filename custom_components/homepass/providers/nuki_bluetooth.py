@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import secrets
+from time import monotonic
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -267,9 +268,7 @@ class NukiBluetoothPairer:
         )
 
     def _get_ble_device(self, address: str) -> Any:
-        return bluetooth.async_ble_device_from_address(
-            self._hass, address, connectable=True
-        )
+        return bluetooth.async_ble_device_from_address(self._hass, address, connectable=True)
 
     @staticmethod
     def _pairing_error(err: Exception, *, stage: str) -> NukiBluetoothPairingError:
@@ -318,12 +317,37 @@ class NukiBluetoothTransport:
         self._credential = credential
         self._time_zone = ZoneInfo(hass.config.time_zone)
         self._operation_lock = asyncio.Lock()
+        self._entry_recommendation: str | None = None
+        self._entry_recommendation_expires = 0.0
+        self._entry_recommendation_lock = asyncio.Lock()
 
     def __repr__(self) -> str:
-        return (
-            f"{type(self).__name__}(address={self._address!r}, "
-            "credential=<redacted>)"
-        )
+        return f"{type(self).__name__}(address={self._address!r}, credential=<redacted>)"
+
+    async def entry_recommendation(self) -> str | None:
+        """Read only the door-fitting flag; never retain or publish raw configuration."""
+        async with self._entry_recommendation_lock:
+            if monotonic() < self._entry_recommendation_expires:
+                return self._entry_recommendation
+
+            async def operation(device: _SecretSafeNukiDevice) -> str | None:
+                challenge = await self._challenge(device)
+                config = await device._send_encrypted_command(
+                    device._const.NukiCommand.REQUEST_CONFIG,
+                    {"nonce": challenge.nonce},
+                    expected_response=device._const.NukiCommand.CONFIG,
+                )
+                value = config.get("auto_unlatch")
+                if type(value) not in {bool, int} or value not in (0, 1):
+                    return None
+                return "open" if value else "unlock"
+
+            try:
+                self._entry_recommendation = await self._run("read door fitting", operation)
+            except ProviderCommunicationError:
+                self._entry_recommendation = None
+            self._entry_recommendation_expires = monotonic() + 300
+            return self._entry_recommendation
 
     async def add_keypad_code(self, request: AuthorizationRequest) -> str:
         async def operation(device: _SecretSafeNukiDevice) -> str:
@@ -340,9 +364,7 @@ class NukiBluetoothTransport:
 
         return await self._run("create keypad code", operation)
 
-    async def update_keypad_code(
-        self, external_id: str, request: AuthorizationRequest
-    ) -> None:
+    async def update_keypad_code(self, external_id: str, request: AuthorizationRequest) -> None:
         code_id = self._code_id(external_id)
 
         async def operation(device: _SecretSafeNukiDevice) -> None:
@@ -396,9 +418,7 @@ class NukiBluetoothTransport:
                 expected_response=device._const.NukiCommand.STATUS,
             )
             return tuple(
-                self._keypad_record(raw)
-                for raw in device._messages
-                if hasattr(raw, "code_id")
+                self._keypad_record(raw) for raw in device._messages if hasattr(raw, "code_id")
             )
 
         return await self._run("read keypad codes", operation)
@@ -428,9 +448,7 @@ class NukiBluetoothTransport:
                     async with asyncio.timeout(_NUKI_CONNECT_TIMEOUT):
                         await device.connect()
                 except Exception as err:
-                    raise NukiBluetoothOperationError(
-                        "connection", type(err).__name__
-                    ) from err
+                    raise NukiBluetoothOperationError("connection", type(err).__name__) from err
                 if device.device_type != NukiConst.NukiDeviceType.SMARTLOCK_ULTRA:
                     raise NukiBluetoothOperationError(
                         "device identification", "UnexpectedDeviceType"
@@ -454,9 +472,7 @@ class NukiBluetoothTransport:
             self._hass, self._address, connectable=True
         )
         if ble_device is None:
-            raise NukiBluetoothOperationError(
-                "discovery", "ConnectableDeviceUnavailable"
-            )
+            raise NukiBluetoothOperationError("discovery", "ConnectableDeviceUnavailable")
         device = _SecretSafeNukiDevice(
             self._address,
             bytes.fromhex(credential.auth_id),
@@ -483,9 +499,7 @@ class NukiBluetoothTransport:
             expected_response=device._const.NukiCommand.CHALLENGE,
         )
 
-    def _keypad_payload(
-        self, request: AuthorizationRequest, nonce: bytes
-    ) -> dict[str, object]:
+    def _keypad_payload(self, request: AuthorizationRequest, nonce: bytes) -> dict[str, object]:
         schedule = request.schedule
         time_limited = bool(
             schedule.valid_from is not None
@@ -519,12 +533,8 @@ class NukiBluetoothTransport:
     def _schedule_from_raw(self, raw: Any) -> AuthorizationSchedule:
         if not bool(raw.time_limited):
             return AuthorizationSchedule()
-        from_minute = int(raw.allowed_from_time.hour) * 60 + int(
-            raw.allowed_from_time.minute
-        )
-        until_minute = int(raw.allowed_until_time.hour) * 60 + int(
-            raw.allowed_until_time.minute
-        )
+        from_minute = int(raw.allowed_from_time.hour) * 60 + int(raw.allowed_from_time.minute)
+        until_minute = int(raw.allowed_until_time.hour) * 60 + int(raw.allowed_until_time.minute)
         weekdays = frozenset(
             day
             for day, name in enumerate(

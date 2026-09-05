@@ -54,8 +54,6 @@ async def test_update_access_reports_pin_incompatibility_without_secret(
         "added": [],
         "removed": [],
         "unchanged": [],
-        "access_points": [
-            {"access_point_id": str(access_point_id), "status": "failed"}
-        ],
+        "access_points": [{"access_point_id": str(access_point_id), "status": "failed"}],
     }
     assert "PIN" not in repr(response)

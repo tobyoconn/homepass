@@ -124,10 +124,7 @@ async def test_options_flow_prevents_unrelated_credential_autofill(
     result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
 
     assert result["type"] is FlowResultType.FORM
-    fields = {
-        marker.schema: field
-        for marker, field in result["data_schema"].schema.items()
-    }
+    fields = {marker.schema: field for marker, field in result["data_schema"].schema.items()}
     assert fields[CONF_NFC_PUBLIC_ORIGIN].config["autocomplete"] == "url"
     assert fields[CONF_NUKI_SECURITY_PIN].config["autocomplete"] == "new-password"
 
@@ -280,9 +277,7 @@ async def test_options_flow_retains_existing_nuki_pairing_when_pin_is_blank(
     )
     pair = AsyncMock()
     monkeypatch.setattr(NukiBluetoothPairer, "pair", pair)
-    monkeypatch.setattr(
-        CredentialVault, "retrieve", AsyncMock(return_value=credential.serialize())
-    )
+    monkeypatch.setattr(CredentialVault, "retrieve", AsyncMock(return_value=credential.serialize()))
     monkeypatch.setattr(
         HomePassOptionsFlow,
         "_list_unmanaged_nuki_authorizations",
@@ -344,9 +339,7 @@ async def test_options_flow_reuses_existing_pairing_even_if_pin_is_supplied(
     )
     pair = AsyncMock()
     monkeypatch.setattr(NukiBluetoothPairer, "pair", pair)
-    monkeypatch.setattr(
-        CredentialVault, "retrieve", AsyncMock(return_value=credential.serialize())
-    )
+    monkeypatch.setattr(CredentialVault, "retrieve", AsyncMock(return_value=credential.serialize()))
     monkeypatch.setattr(
         HomePassOptionsFlow,
         "_list_unmanaged_nuki_authorizations",
@@ -401,9 +394,7 @@ async def test_options_flow_contains_existing_pairing_scan_timeout(
         "_discovered_nuki_locks",
         lambda self, current: {address: f"Nuki Ultra — {address}"},
     )
-    monkeypatch.setattr(
-        CredentialVault, "retrieve", AsyncMock(return_value=credential.serialize())
-    )
+    monkeypatch.setattr(CredentialVault, "retrieve", AsyncMock(return_value=credential.serialize()))
 
     async def stall(*args, **kwargs):
         await asyncio.sleep(60)
@@ -560,9 +551,7 @@ async def test_initial_pairing_can_delete_every_existing_nuki_pin(
     assert result["step_id"] == "nuki_confirm_delete"
     remove.assert_not_awaited()
 
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {}
-    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert [call.args[0] for call in remove.await_args_list] == ["17", "18"]
@@ -599,9 +588,7 @@ async def test_options_flow_deletes_only_selected_existing_nuki_pins(
         AsyncMock(return_value=existing),
     )
     remove = AsyncMock(
-        return_value=AuthorizationMutation(
-            AuthorizationMutationState.PENDING, external_id="17"
-        )
+        return_value=AuthorizationMutation(AuthorizationMutationState.PENDING, external_id="17")
     )
     monkeypatch.setattr(NukiLocalAuthorizationProvider, "delete_authorization", remove)
     monkeypatch.setattr(
@@ -628,14 +615,10 @@ async def test_options_flow_deletes_only_selected_existing_nuki_pins(
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "nuki_confirm_delete"
-    assert result["description_placeholders"] == {
-        "pins": "Remove me — enabled — Nuki ID 17"
-    }
+    assert result["description_placeholders"] == {"pins": "Remove me — enabled — Nuki ID 17"}
     remove.assert_not_awaited()
 
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {}
-    )
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     remove.assert_awaited_once_with("17")
@@ -667,9 +650,7 @@ async def test_existing_pin_review_excludes_homepass_managed_authorizations(
     flow = HomePassOptionsFlow(entry)
     flow.hass = hass
 
-    records = await flow._list_unmanaged_nuki_authorizations(
-        provider, "lock.front_door"
-    )
+    records = await flow._list_unmanaged_nuki_authorizations(provider, "lock.front_door")
 
     assert tuple(record.external_id for record in records) == ("18",)
 
@@ -687,15 +668,11 @@ async def test_existing_pin_review_retries_transient_bluetooth_read_failures(
         (AuthorizationRecord("17", "Existing guest", True),),
     )
     retry_delay = AsyncMock()
-    monkeypatch.setattr(
-        "custom_components.homepass.config_flow.asyncio.sleep", retry_delay
-    )
+    monkeypatch.setattr("custom_components.homepass.config_flow.asyncio.sleep", retry_delay)
     flow = HomePassOptionsFlow(entry)
     flow.hass = hass
 
-    records = await flow._list_unmanaged_nuki_authorizations(
-        provider, "lock.front_door"
-    )
+    records = await flow._list_unmanaged_nuki_authorizations(provider, "lock.front_door")
 
     assert tuple(record.external_id for record in records) == ("17",)
     assert provider.list_authorizations.await_count == 3

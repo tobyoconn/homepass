@@ -98,7 +98,8 @@ class NfcTag:
             last_counter=None if data.get("last_counter") is None else int(data["last_counter"]),
             created_at=_parse_timestamp(data["created_at"]),
             admin_key_credential_id=(
-                None if data.get("admin_key_credential_id") is None
+                None
+                if data.get("admin_key_credential_id") is None
                 else str(data["admin_key_credential_id"])
             ),
             write_protected=_strict_bool(

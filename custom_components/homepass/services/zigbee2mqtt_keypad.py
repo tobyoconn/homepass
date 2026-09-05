@@ -71,7 +71,7 @@ def parse_zigbee2mqtt_keypad_command(payload: str) -> Zigbee2MqttKeypadCommand |
         return None
     try:
         data = json.loads(payload)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if not isinstance(data, Mapping):
         return None

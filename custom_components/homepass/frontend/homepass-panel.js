@@ -35,6 +35,7 @@ const UPDATE_ACCESS_POINT_ACTION = "update_access_point";
 const REMOVE_ACCESS_POINT_ACTION = "remove_access_point";
 const LOCK_ACCESS_POINT_ACTION = "lock_access_point";
 const UNLOCK_ACCESS_POINT_ACTION = "unlock_access_point";
+const OPEN_ACCESS_POINT_ACTION = "open_access_point";
 const GET_DOOR_DETAILS_ACTION = "get_door_details";
 const LIST_ACCESS_DEVICES_ACTION = "list_access_devices";
 const ADD_ACCESS_DEVICE_ACTION = "add_access_device";
@@ -214,6 +215,8 @@ function escapeHtml(value) {
 }
 
 function doorStatusIconForState(lockState, doorState, availability) {
+  // A withdrawn latch is unlocked; only the contact sensor determines door position.
+  if (lockState === "open") lockState = "unlocked";
   if (!["available", "online"].includes(availability)) {
     return DOOR_STATUS_ICON_URLS.UNKNOWN;
   }
@@ -244,8 +247,8 @@ function doorStatusAccessibleText(
     jammed: "jammed",
     locked: "locked",
     locking: "locking",
-    open: "open",
-    opening: "opening",
+    open: "latch released",
+    opening: "releasing latch",
     unlocked: "unlocked",
     unlocking: "unlocking",
   };
@@ -1084,6 +1087,7 @@ class HomePassPanel extends HTMLElement {
         service_data: {},
         return_response: true,
       });
+      this._batteryThresholds = result.response?.battery_thresholds;
       this._dashboardAccessPoints = result.response?.access_points ?? [];
       const operationAccessPoint = this._dashboardAccessPoints.find(
         (door) => door.id === this._doorOperationAccessPointId,
@@ -2742,6 +2746,10 @@ class HomePassPanel extends HTMLElement {
     this._removeDoorConfirmationOpen = false;
     this._doorControlReturnFocusSelector = returnFocusSelector;
     this._doorControlDialogOpen = true;
+    this._manualEntryChoice = undefined;
+    this._openPolicySettingsExpanded = false;
+    this._openPolicyNotice = undefined;
+    this._openPolicyDrafts = new Map();
     this._render();
     this._startDoorRelativeTimeTimer();
     void Promise.all([
@@ -3458,6 +3466,7 @@ class HomePassPanel extends HTMLElement {
     if (this._addDoorDialogOpen) return;
     if (!this._hass?.user?.is_admin) return;
     this._addDoorDialogOpen = true;
+    this._openPolicyDrafts = new Map();
     this._availableAccessPoints = [];
     this._availableAccessPointsLoading = true;
     this._availableAccessPointsError = undefined;
@@ -3566,6 +3575,10 @@ class HomePassPanel extends HTMLElement {
     if (this._enrollingDoor) return;
     const manual = this._addDoorSource === "home_assistant";
     if (manual ? !this._haDoorManualFormValid() : !this._selectedAvailableAccessPointId) return;
+    const openDoor = this._onboardingOpenDoor();
+    const draft = openDoor?.supports_open ? this._openPolicyDraft(openDoor, "onboarding") : undefined;
+    if (draft && !draft.confirmed) return;
+    const openPolicy = draft ? { open_enabled: draft.enabled, entry_action: draft.entry } : {};
     this._enrollingDoor = true;
     this._availableAccessPointsError = undefined;
     this._render();
@@ -3576,6 +3589,7 @@ class HomePassPanel extends HTMLElement {
         service: manual ? ENROLL_HOME_ASSISTANT_ACCESS_POINT_ACTION : ENROLL_ACCESS_POINT_ACTION,
         service_data: manual
           ? {
+              ...openPolicy,
               display_name: this._haDoorDisplayName.trim(),
               device_id: this._haDoorDeviceId,
               control_profile: this._haDoorProfile,
@@ -3584,7 +3598,7 @@ class HomePassPanel extends HTMLElement {
               status_inverted: this._haDoorStatusInverted,
               pulse_seconds: Number(this._haDoorPulseSeconds),
             }
-          : { access_point_id: this._selectedAvailableAccessPointId },
+          : { access_point_id: this._selectedAvailableAccessPointId, ...openPolicy },
         return_response: true,
       });
       this._addDoorDialogElement = undefined;
@@ -3642,6 +3656,7 @@ class HomePassPanel extends HTMLElement {
     if (!door?.lock_entity_id || !hass?.states) return door;
     const projected = { ...door };
     const lock = hass.states[door.lock_entity_id];
+    projected.supports_open = door.control_profile === "lock" && Boolean((lock?.attributes?.supported_features ?? 0) & 1);
     const contact = door.door_entity_id ? hass.states[door.door_entity_id] : undefined;
 
     delete projected.lock_state;
@@ -3710,33 +3725,61 @@ class HomePassPanel extends HTMLElement {
 
   _batteryReading(hass, entityId, fallbackPercentage, fallbackStatus) {
     let percentage = Number.isInteger(fallbackPercentage) ? fallbackPercentage : undefined;
-    let status = ["normal", "low", "critical", "unknown"].includes(fallbackStatus)
-      ? fallbackStatus
-      : undefined;
+    let status = fallbackStatus;
     const state = entityId ? hass?.states?.[entityId] : undefined;
+    if (entityId && !state) { percentage = undefined; status = "unknown"; }
     if (state) {
-      const numeric = [
-        state.state,
-        state.attributes?.battery_level,
-        state.attributes?.battery_percentage,
-        state.attributes?.battery,
-      ]
-        .map((value) => Number(value))
-        .find((value) => Number.isFinite(value) && value >= 0 && value <= 100);
-      if (numeric !== undefined) {
-        percentage = Math.round(numeric);
-        status = percentage <= 10 ? "critical" : percentage <= 20 ? "low" : "normal";
-      } else if (state.attributes?.device_class === "battery" && entityId.startsWith("binary_sensor.")) {
+      if (["unknown", "unavailable"].includes(state.state)) {
+        percentage = undefined; status = "unknown";
+      } else if (entityId.startsWith("binary_sensor.") && state.attributes?.device_class === "battery") {
         percentage = undefined;
         status = state.state === "on" ? "low" : state.state === "off" ? "normal" : "unknown";
-      } else if (["unknown", "unavailable"].includes(state.state)) {
-        percentage = undefined;
-        status = "unknown";
+      } else {
+        const numeric = [
+          ...(entityId.startsWith("sensor.") ? [state.state] : []),
+          state.attributes?.battery_level, state.attributes?.battery_percentage, state.attributes?.battery,
+        ].filter((value) => value !== null && value !== undefined && !(typeof value === "string" && value.trim() === "") && typeof value !== "boolean")
+          .map(Number).find((value) => Number.isFinite(value) && value >= 0 && value <= 100);
+        percentage = numeric === undefined ? undefined : Math.round(numeric);
+        status = percentage === undefined ? "unknown" : this._batteryThresholds
+          ? percentage <= this._batteryThresholds.critical ? "critical"
+            : percentage <= this._batteryThresholds.low ? "low" : "normal"
+          : fallbackStatus ?? "unknown";
       }
     }
-    return percentage !== undefined || (status && status !== "unknown")
-      ? { entityId, percentage, status: status ?? "unknown" }
-      : undefined;
+    return entityId || percentage !== undefined || status
+      ? { entityId, percentage, status: status ?? "unknown" } : undefined;
+  }
+
+  _dashboardBatteries(door) {
+    const read = (entityId, percentage, status) => this._batteryReading(this._hass, entityId, percentage, status);
+    const readings = [
+      read(door.battery_entity_id, door.battery_percentage, door.battery_status),
+      read(door.door_sensor_battery_entity_id, door.door_sensor_battery_percentage, door.door_sensor_battery_status),
+    ];
+    const seen = new Set(readings.filter(Boolean).map((reading) => reading.entityId));
+    const rank = { critical: 0, low: 1, unknown: 2, normal: 3 };
+    const accessory = (door.access_device_batteries ?? [])
+      .map((device) => read(device.battery_entity_id, device.battery_percentage, device.battery_status))
+      .filter((reading) => reading && !seen.has(reading.entityId))
+      .sort((a, b) => rank[a.status] - rank[b.status] || String(a.entityId).localeCompare(String(b.entityId)))[0];
+    if (accessory) readings.push(accessory);
+    const unique = new Set();
+    return readings.filter((reading) => {
+      if (!reading || (reading.entityId && unique.has(reading.entityId))) return false;
+      unique.add(reading.entityId); return true;
+    });
+  }
+
+  _dashboardBatteryMarkup(door) {
+    return this._dashboardBatteries(door).map((reading) => {
+      const level = reading.percentage === undefined ? undefined : Math.round(reading.percentage / 10) * 10;
+      const label = reading.status === "unknown" ? "Battery unavailable"
+        : reading.percentage === undefined ? `Battery ${reading.status}` : `Battery ${reading.percentage}%`;
+      return `<span class="dashboard-battery ${escapeHtml(reading.status)}" role="img" aria-label="${escapeHtml(label)}">
+        <span class="dashboard-battery-body">${level === undefined ? '<span class="battery-unknown">?</span>' : `<span class="dashboard-battery-fill" style="height:${level}%"></span>`}</span>
+      </span>`;
+    }).join("");
   }
 
   _batteryMarkup(reading, label = "Battery") {
@@ -3747,7 +3790,7 @@ class HomePassPanel extends HTMLElement {
       : status === "low" ? "mdi:battery-low" : "mdi:battery";
     const value = reading.percentage !== undefined
       ? `${reading.percentage}%`
-      : status === "critical" ? "critical" : status === "low" ? "low" : "OK";
+      : status === "critical" ? "critical" : status === "low" ? "low" : status === "unknown" ? "unavailable" : "OK";
     return `<span class="device-battery ${escapeHtml(status)}"><ha-icon icon="${icon}" aria-hidden="true"></ha-icon>${escapeHtml(label)} ${escapeHtml(value)}</span>`;
   }
 
@@ -4365,6 +4408,14 @@ class HomePassPanel extends HTMLElement {
   _availableDoorOperation() {
     if (this._doorControlLoading || this._doorControlError) return undefined;
     if (this._selectedDoor?.availability !== "available") return undefined;
+    if (this._selectedDoor?.open_enabled && this._selectedDoor?.supports_open &&
+        ["locked", "unlocked"].includes(this._selectedDoor.lock_state)) {
+      if (!this._manualEntryChoice) return undefined;
+      return this._manualEntryChoice === "open"
+        ? { action: "open", service: OPEN_ACCESS_POINT_ACTION, targetState: "open" }
+        : { action: this._manualEntryChoice, service: this._manualEntryChoice === "lock" ? LOCK_ACCESS_POINT_ACTION : UNLOCK_ACCESS_POINT_ACTION,
+            targetState: this._manualEntryChoice === "lock" ? "locked" : "unlocked" };
+    }
     return this._doorOperationForState(this._selectedDoor);
   }
 
@@ -4575,6 +4626,7 @@ class HomePassPanel extends HTMLElement {
       this._completeDoorOperation(generation);
       return;
     }
+    if (this._doorOperationTargetState === "open" && ["locked", "unlocking", "unlocked", "opening"].includes(lockState)) return;
     const expectedTransition = ["unlock", "open"].includes(this._doorOperationAction)
       ? "unlocking"
       : "locking";
@@ -4591,6 +4643,7 @@ class HomePassPanel extends HTMLElement {
     if (!this._doorOperationOwns(generation)) return;
     this._clearDoorOperationTimeout();
     this._doorOperationState = DOOR_OPERATION_STATE.SUCCESS;
+    this._manualEntryChoice = undefined;
     this._doorOperationError = undefined;
     this._updateDoorOperationSurfaces();
     this._doorOperationSuccessTimer = window.setTimeout(() => {
@@ -4632,6 +4685,14 @@ class HomePassPanel extends HTMLElement {
     const remove = this.shadowRoot.querySelector("#open-remove-door-confirmation");
     if (!region || !slider || !error) return;
 
+    const choice = this.shadowRoot.querySelector("#door-open-choice");
+    if (choice) {
+      choice.hidden = !(this._selectedDoor?.open_enabled && this._selectedDoor?.supports_open);
+      choice.querySelectorAll("button").forEach((button) => {
+        button.disabled = this._doorOperationIsBusy() || this._selectedDoor?.availability !== "available";
+        if (button.dataset.manualEntry === "lock") button.hidden = this._selectedDoor?.lock_state !== "unlocked";
+      });
+    }
     const available = this._availableDoorOperation();
     const unavailable = Boolean(this._doorControlLoading || this._doorControlError);
     const unavailableOperation = unavailable
@@ -8326,6 +8387,19 @@ class HomePassPanel extends HTMLElement {
           color: var(--warning-color, #9a5b00);
         }
 
+        .dashboard-symbol-stack { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .dashboard-batteries { display: flex; justify-content: center; gap: 4px; }
+        .dashboard-batteries:empty { display: none; }
+        .dashboard-battery { width: 10px; height: 18px; position: relative; color: var(--success-color, #22863a); }
+        .dashboard-battery.low { color: #c99500; }
+        .dashboard-battery.critical { color: var(--error-color, #d32f2f); }
+        .dashboard-battery.unknown { color: var(--secondary-text-color, #888); }
+        .dashboard-battery::before { content: ""; position: absolute; width: 4px; height: 2px; background: currentColor; left: 3px; top: 0; }
+        .dashboard-battery-body { position: absolute; inset: 2px 0 0; border: 1.5px solid currentColor; border-radius: 2px; overflow: hidden; }
+        .dashboard-battery-fill { position: absolute; bottom: 0; left: 0; width: 100%; background: currentColor; }
+        .battery-unknown { display: block; font-size: 10px; line-height: 13px; text-align: center; }
+        .door-open-choice, .open-policy { display: grid; gap: 10px; margin-block: 12px; }
+        .door-open-choice button { padding: 12px; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; }
         .device-battery {
           display: inline-flex;
           align-items: center;
@@ -8825,7 +8899,7 @@ class HomePassPanel extends HTMLElement {
 
         .door-card {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-columns: minmax(0, 1fr);
           gap: 12px;
           min-height: 94px;
           padding: 16px 18px;
@@ -9835,6 +9909,14 @@ class HomePassPanel extends HTMLElement {
           "slide-action-state-changed",
           (event) => this._handleDoorSlideState(event),
         );
+        this.shadowRoot.querySelectorAll("[data-manual-entry]").forEach((button) => {
+          button.addEventListener("click", () => {
+            if (this._doorOperationIsBusy()) return;
+            this._manualEntryChoice = button.dataset.manualEntry;
+            this._updateDoorOperationControls();
+          });
+        });
+        this._bindOpenPolicy("settings");
         this._updateDoorControlDialog();
         if (restoreDoorSlideFocus) slideAction.focus();
       }
@@ -9869,6 +9951,7 @@ class HomePassPanel extends HTMLElement {
       this.shadowRoot
         .querySelector("#confirm-add-door")
         .addEventListener("click", () => void this._enrollSelectedDoor());
+      this._bindOpenPolicy("onboarding");
       const source = this.shadowRoot.querySelector("#add-door-source");
       source?.addEventListener("change", () => {
         this._addDoorSource = source.value;
@@ -9901,7 +9984,7 @@ class HomePassPanel extends HTMLElement {
           this._haDoorDisplayName = entity ? this._haDoorEntityLabel(entity) : "";
           if (name) name.value = this._haDoorDisplayName;
         }
-        this.shadowRoot.querySelector("#confirm-add-door").disabled = !this._haDoorManualFormValid();
+        this._render();
       });
       const status = this.shadowRoot.querySelector("#ha-door-status-entity");
       status?.addEventListener("change", () => {
@@ -10475,6 +10558,13 @@ class HomePassPanel extends HTMLElement {
                 </div>
               </div>
             </section>
+            <div id="door-open-choice" class="door-open-choice" hidden>
+              <p>Choose what should happen this time.</p>
+              <button type="button" data-manual-entry="unlock">Unlock — leave the latch engaged</button>
+              <button type="button" data-manual-entry="open">Open Door — briefly retract the latch</button>
+              <button type="button" data-manual-entry="lock">Lock</button>
+            </div>
+            ${this._hass?.user?.is_admin ? this._openPolicyMarkup(this._selectedDoor, "settings") : ""}
             <div id="door-operation-region" class="door-operation-region" hidden>
               <${SLIDE_ACTION_WEB_COMPONENT} id="door-slide-action">
               </${SLIDE_ACTION_WEB_COMPONENT}>
@@ -10684,6 +10774,91 @@ class HomePassPanel extends HTMLElement {
     `;
   }
 
+  _onboardingOpenDoor() {
+    if (this._addDoorSource !== "home_assistant") {
+      return this._availableAccessPoints.find((door) => door.id === this._selectedAvailableAccessPointId);
+    }
+    const known = this._availableAccessPoints.find((door) => door.lock_entity_id === this._haDoorControlEntityId);
+    return { ...known, id: this._haDoorControlEntityId,
+      supports_open: this._haDoorProfile === "lock" && Boolean((this._hass?.states?.[this._haDoorControlEntityId]?.attributes?.supported_features ?? 0) & 1) };
+  }
+
+  _openPolicyDraft(door, context) {
+    this._openPolicyDrafts ??= new Map();
+    const key = `${context}:${door?.id}`;
+    if (!this._openPolicyDrafts.has(key)) {
+      const entry = context === "settings" ? door.entry_action : door.recommended_entry_action;
+      this._openPolicyDrafts.set(key, {
+        enabled: context === "settings" ? Boolean(door.open_enabled) : entry === "open",
+        entry: entry ?? "unlock", confirmed: false,
+      });
+    }
+    return this._openPolicyDrafts.get(key);
+  }
+
+  _openPolicyMarkup(door, context) {
+    if (!door || (!door.supports_open && !door.open_enabled)) return "";
+    const draft = this._openPolicyDraft(door, context);
+    const recommendation = door.recommended_entry_action === "open"
+      ? "Nuki’s door-fitting setup recommends Open Door for entry."
+      : door.recommended_entry_action === "unlock"
+        ? "Nuki’s door-fitting setup recommends Unlock for entry."
+        : "Door-fitting information is unavailable. Choose whether outside entry needs latch retraction.";
+    const content = `<section class="open-policy" aria-label="Open Door settings">
+      <strong>${door.supports_open ? "This lock supports separate Unlock and Open commands." : "Open Door is currently unavailable."}</strong>
+      <p>Unlock releases the lock and leaves the latch engaged. Open Door also briefly retracts the latch so the door can be pushed or pulled open without turning an outside handle.</p>
+      <p>${recommendation}</p>
+      <label><input id="${context}-open-enabled" type="checkbox" ${draft.enabled ? "checked" : ""} ${!door.supports_open && !draft.enabled ? "disabled" : ""}/> Enable Lock, Unlock &amp; Open Door</label>
+      <p class="muted">Leave unchecked to use Lock &amp; Unlock only.</p>
+      <label>PIN/NFC entry action<select id="${context}-entry-action" ${!draft.enabled ? "disabled" : ""}>
+        <option value="unlock" ${draft.entry === "unlock" ? "selected" : ""}>Unlock — use the outside handle</option>
+        <option value="open" ${draft.entry === "open" ? "selected" : ""}>Open Door — retract the latch</option>
+      </select></label>
+      ${door.recommended_entry_action ? '<p class="muted">Nuki’s own keypad and fingerprints use the locking action set in the Nuki app. Match that setting to your intended entry behaviour.</p>' : ""}
+      <label><input id="${context}-open-confirmed" type="checkbox" ${draft.confirmed ? "checked" : ""}/> I confirm these HomePASS controls and entry behaviour.</label>
+      ${context === "settings" ? `<ha-button id="save-open-policy" ${!draft.confirmed || this._savingOpenPolicy ? "disabled" : ""}>Save door behaviour</ha-button>` : ""}
+      ${context === "settings" && this._openPolicyNotice ? `<p role="status">${escapeHtml(this._openPolicyNotice)}</p>` : ""}
+    </section>`;
+    return context === "settings"
+      ? `<details id="open-policy-settings" ${this._openPolicySettingsExpanded ? "open" : ""}><summary>Door behaviour</summary>${content}</details>`
+      : content;
+  }
+
+  _bindOpenPolicy(context) {
+    const door = context === "settings" ? this._selectedDoor : this._onboardingOpenDoor();
+    if (!door || (!door.supports_open && !door.open_enabled)) return;
+    const draft = this._openPolicyDraft(door, context);
+    const settings = this.shadowRoot.querySelector("#open-policy-settings");
+    settings?.addEventListener("toggle", () => { this._openPolicySettingsExpanded = settings.open; });
+    for (const field of ["open-enabled", "entry-action", "open-confirmed"]) {
+      const input = this.shadowRoot.querySelector(`#${context}-${field}`);
+      input?.addEventListener("change", () => {
+        if (field === "open-enabled") { draft.enabled = input.checked; if (!draft.enabled) draft.entry = "unlock"; draft.confirmed = false; }
+        if (field === "entry-action") { draft.entry = input.value; draft.confirmed = false; }
+        if (field === "open-confirmed") draft.confirmed = input.checked;
+        this._render();
+      });
+    }
+    this.shadowRoot.querySelector("#save-open-policy")?.addEventListener("click", () => void this._saveOpenPolicy());
+  }
+
+  async _saveOpenPolicy() {
+    const door = this._selectedDoor;
+    if (!door || !this._hass?.user?.is_admin || this._savingOpenPolicy || this._doorOperationIsBusy()) return;
+    const draft = this._openPolicyDraft(door, "settings");
+    if (!draft.confirmed) return;
+    this._savingOpenPolicy = true;
+    try {
+      await this._hass.callWS({ type: "call_service", domain: DOMAIN, service: UPDATE_ACCESS_POINT_ACTION,
+        service_data: { access_point_id: door.id, open_enabled: draft.enabled, entry_action: draft.entry }, return_response: true });
+      this._openPolicyNotice = "Door behaviour saved.";
+      this._manualEntryChoice = undefined;
+      draft.confirmed = false;
+      await this._loadDashboardAccessPoints({ render: false });
+    } catch (_error) { this._openPolicyNotice = "Door behaviour could not be saved. Check that Open Door is still supported and try again."; }
+    finally { this._savingOpenPolicy = false; this._render(); }
+  }
+
   _addDoorDialogTemplate() {
     const options = this._availableAccessPoints
       .map(
@@ -10734,8 +10909,10 @@ class HomePassPanel extends HTMLElement {
     const content = this._addDoorSource === "home_assistant"
       ? manualContent
       : `<p>HomePASS-compatible locks discovered automatically</p><div class="access-point-options" role="radiogroup">${discoveredContent}</div>`;
-    const canSubmit = this._addDoorSource === "home_assistant"
-      ? this._haDoorManualFormValid() : Boolean(this._selectedAvailableAccessPointId);
+    const openDoor = this._onboardingOpenDoor();
+    const openConfirmed = !openDoor?.supports_open || this._openPolicyDraft(openDoor, "onboarding").confirmed;
+    const canSubmit = openConfirmed && (this._addDoorSource === "home_assistant"
+      ? this._haDoorManualFormValid() : Boolean(this._selectedAvailableAccessPointId));
     return `<ha-dialog id="add-door-dialog" open>
       <ha-dialog-header slot="header"><span slot="title">Add Door</span></ha-dialog-header>
       <div class="dialog-content">
@@ -10745,6 +10922,7 @@ class HomePassPanel extends HTMLElement {
         </select></label>
         ${this._availableAccessPointsError ? `<p class="form-error" role="alert">${escapeHtml(this._availableAccessPointsError)}</p>` : ""}
         ${content}
+        ${this._openPolicyMarkup(openDoor, "onboarding")}
       </div>
       <ha-dialog-footer slot="footer">
         <ha-button id="cancel-add-door" appearance="plain" slot="secondaryAction">Cancel</ha-button>
@@ -11080,8 +11258,8 @@ class HomePassPanel extends HTMLElement {
       jammed: "Jammed",
       locked: "Locked",
       locking: "Locking",
-      open: "Open",
-      opening: "Opening",
+      open: "Latch released",
+      opening: "Releasing latch",
       unlocked: "Unlocked",
       unlocking: "Unlocking",
     };
@@ -11320,7 +11498,12 @@ class HomePassPanel extends HTMLElement {
     contactState.className = "dashboard-door-contact-state";
     const managementState = document.createElement("p");
     managementState.className = "door-management-state";
-    identity.append(statusIconSlot);
+    const batteryStack = document.createElement("div");
+    batteryStack.className = "dashboard-symbol-stack";
+    const batteries = document.createElement("div");
+    batteries.className = "dashboard-batteries";
+    batteryStack.append(batteries, statusIconSlot);
+    identity.append(batteryStack);
     copy.append(heading, lockState, contactState, managementState);
     open.append(identity, copy);
     const control = document.createElement("div");
@@ -11388,6 +11571,8 @@ class HomePassPanel extends HTMLElement {
       "aria-label",
       [accessibleStatus, managementLabel].filter(Boolean).join(". "),
     );
+    const batteries = card.querySelector(".dashboard-batteries");
+    if (batteries) batteries.innerHTML = this._dashboardBatteryMarkup(door);
     this._updateDashboardDoorAction(actionButton, operationStatus, door);
   }
 
@@ -11423,7 +11608,7 @@ class HomePassPanel extends HTMLElement {
     const confirmationRequired = ["unlock", "open", "release", "operate"].includes(
       operation?.action,
     );
-    const actionLabel = ({
+    const actionLabel = door.open_enabled && door.supports_open ? "Choose action" : ({
       lock: "Lock",
       unlock: "Unlock",
       open: "Open",
@@ -11471,7 +11656,7 @@ class HomePassPanel extends HTMLElement {
     const door = this._doorWithHassState(accessPoint, this._hass);
     if (!this._dashboardDoorCanOperate(door)) return;
     const operation = this._doorOperationForState(door);
-    if (["unlock", "open", "release", "operate"].includes(operation?.action)) {
+    if (door.open_enabled && door.supports_open || ["unlock", "open", "release", "operate"].includes(operation?.action)) {
       this._openDoorControlDialog(
         accessPoint,
         `#dashboard-door-action-${accessPointId}`,
@@ -11536,6 +11721,7 @@ class HomePassPanel extends HTMLElement {
         accessPoint.door_entity_id,
         accessPoint.battery_entity_id,
         accessPoint.door_sensor_battery_entity_id,
+        ...(accessPoint.access_device_batteries ?? []).map((device) => device.battery_entity_id),
       ].filter(Boolean);
       if (
         sourceIds.length === 0 ||

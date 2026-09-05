@@ -75,9 +75,7 @@ async def test_local_provider_sanitizes_transport_failure() -> None:
     transport.add_keypad_code.side_effect = ProviderCommunicationError(
         "Nuki Bluetooth could not create keypad code"
     )
-    result = await NukiLocalAuthorizationProvider(
-        transport
-    ).create_authorization(_request())
+    result = await NukiLocalAuthorizationProvider(transport).create_authorization(_request())
 
     assert result.state is AuthorizationMutationState.FAILED
     assert result.error_summary == "Nuki Bluetooth could not create keypad code"

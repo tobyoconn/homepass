@@ -114,7 +114,7 @@ class PersonRepository(Repository[Person, UUID]):
         try:
             async with self._lock:
                 await self._storage_manager.async_transaction(mutator)
-        except (DuplicatePersonError, PersonNotFoundError, StorageError):
+        except DuplicatePersonError, PersonNotFoundError, StorageError:
             raise
         except Exception as err:
             raise StorageError("Unable to save HomePASS people") from err

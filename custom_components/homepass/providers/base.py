@@ -155,6 +155,9 @@ class LockControlProvider(Protocol):
     async def lock(self, entity_id: str, *, context: object | None = None) -> None:
         """Lock through the local provider."""
 
+    async def open(self, entity_id: str, *, context: object | None = None) -> None:
+        """Release the latch through an explicit Open command."""
+
     async def unlock(self, entity_id: str, *, context: object | None = None) -> None:
         """Unlock through the local provider."""
 
