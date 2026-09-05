@@ -63,7 +63,8 @@ Manual development installations do not receive HACS-managed updates.
 
 ## Release process
 
-1. Update the version in `custom_components/homepass/manifest.json` and `pyproject.toml`.
+1. Update the version in `custom_components/homepass/manifest.json`,
+   `custom_components/homepass/const.py`, and `pyproject.toml` together.
 2. Add the release notes to `CHANGELOG.md`.
 3. Merge the tested changes.
 4. Create and push a matching tag such as `v1.16.5`.
