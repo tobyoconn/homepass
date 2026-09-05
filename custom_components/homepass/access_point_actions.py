@@ -37,7 +37,9 @@ from .const import (
     SERVICE_REMOVE_ACCESS_POINT,
     SERVICE_UPDATE_ACCESS_POINT,
     SERVICE_UNLOCK_ACCESS_POINT,
+    SERVICE_OPEN_ACCESS_POINT,
 )
+from .battery import LOW_BATTERY_PERCENTAGE, CRITICAL_BATTERY_PERCENTAGE
 from .exceptions import AccessPointHasGrantsError, HomePASSError
 from .models import LockEventOrigin
 from .nfc.repository import NfcAccessRepository
@@ -46,6 +48,7 @@ from .services import (
     AccessPointSummary,
     AccessPointCommandService,
     DoorDetailsService,
+    AccessDeviceService,
 )
 
 ACCESS_POINT_ACTIONS = (
@@ -57,13 +60,20 @@ ACCESS_POINT_ACTIONS = (
     SERVICE_REMOVE_ACCESS_POINT,
     SERVICE_LOCK_ACCESS_POINT,
     SERVICE_UNLOCK_ACCESS_POINT,
+    SERVICE_OPEN_ACCESS_POINT,
     SERVICE_GET_DOOR_DETAILS,
 )
 EMPTY_SCHEMA = vol.Schema({})
 ACCESS_POINT_SCHEMA = vol.Schema({vol.Required(ATTR_ACCESS_POINT_ID): str})
+OPEN_POLICY_FIELDS = {
+    vol.Optional("open_enabled"): bool,
+    vol.Optional("entry_action"): vol.In(("unlock", "open")),
+}
+ENROLL_ACCESS_POINT_SCHEMA = ACCESS_POINT_SCHEMA.extend(OPEN_POLICY_FIELDS)
 UPDATE_ACCESS_POINT_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_ACCESS_POINT_ID): str,
+        **OPEN_POLICY_FIELDS,
         vol.Optional(ATTR_DISPLAY_NAME): vol.All(str, vol.Length(min=1, max=80)),
         vol.Optional(ATTR_STATUS_ENTITY_ID): vol.Any(None, str),
         vol.Optional(ATTR_STATUS_INVERTED): bool,
@@ -71,6 +81,7 @@ UPDATE_ACCESS_POINT_SCHEMA = vol.Schema(
 )
 HOME_ASSISTANT_ACCESS_POINT_SCHEMA = vol.Schema(
     {
+        **OPEN_POLICY_FIELDS,
         vol.Required(ATTR_DISPLAY_NAME): str,
         vol.Required(ATTR_DEVICE_ID): str,
         vol.Required(ATTR_CONTROL_ENTITY_ID): str,
@@ -101,7 +112,13 @@ def _access_points_response(
         items.append(item)
     return cast(
         ServiceResponse,
-        {"access_points": items},
+        {
+            "access_points": items,
+            "battery_thresholds": {
+                "low": LOW_BATTERY_PERCENTAGE,
+                "critical": CRITICAL_BATTERY_PERCENTAGE,
+            },
+        },
     )
 
 
@@ -112,6 +129,7 @@ def async_register_access_point_actions(
     door_details_service: DoorDetailsService,
     command_service: AccessPointCommandService,
     nfc_repository: NfcAccessRepository | None = None,
+    access_device_service: AccessDeviceService | None = None,
 ) -> None:
     """Register HomePASS Access Point actions."""
 
@@ -131,10 +149,21 @@ def async_register_access_point_actions(
 
     async def handle_list_access_points(_call: ServiceCall) -> ServiceResponse:
         access_points = await access_point_service.list_access_point_summaries()
-        return _access_points_response(
-            access_points,
-            await nfc_tag_counts(),
-        )
+        response = _access_points_response(access_points, await nfc_tag_counts())
+        devices = await access_device_service.list_views() if access_device_service else ()
+        for door in response["access_points"]:
+            door["access_device_batteries"] = [
+                {
+                    "id": str(view.device.id),
+                    "display_name": view.device.display_name,
+                    "battery_entity_id": view.battery_entity_id,
+                    "battery_percentage": view.battery_percentage,
+                    "battery_status": view.battery_status,
+                }
+                for view in sorted(devices, key=lambda view: str(view.device.id))
+                if str(view.device.access_point_id) == door["id"] and view.battery_entity_id
+            ]
+        return response
 
     async def handle_list_available(_call: ServiceCall) -> ServiceResponse:
         return _access_points_response(
@@ -146,7 +175,9 @@ def async_register_access_point_actions(
         await require_admin(call)
         try:
             summary = await access_point_service.enroll_access_point(
-                UUID(call.data[ATTR_ACCESS_POINT_ID])
+                UUID(call.data[ATTR_ACCESS_POINT_ID]),
+                open_enabled=call.data.get("open_enabled"),
+                entry_action=call.data.get("entry_action", "unlock"),
             )
         except (TypeError, ValueError) as err:
             raise ServiceValidationError(str(err)) from None
@@ -201,6 +232,8 @@ def async_register_access_point_actions(
                 device_id=device_id,
                 status_inverted=call.data[ATTR_STATUS_INVERTED],
                 pulse_seconds=call.data[ATTR_PULSE_SECONDS],
+                open_enabled=call.data.get("open_enabled"),
+                entry_action=call.data.get("entry_action", "unlock"),
             )
         except (TypeError, ValueError) as err:
             raise ServiceValidationError(str(err)) from None
@@ -221,7 +254,10 @@ def async_register_access_point_actions(
         has_name = ATTR_DISPLAY_NAME in call.data
         has_status = ATTR_STATUS_ENTITY_ID in call.data
         has_inversion = ATTR_STATUS_INVERTED in call.data
-        if not has_name and not has_status:
+        has_open = "open_enabled" in call.data or "entry_action" in call.data
+        if has_open and not {"open_enabled", "entry_action"} <= call.data.keys():
+            raise ServiceValidationError("Confirm Open Door permission and entry action together")
+        if not has_name and not has_status and not has_open:
             raise ServiceValidationError("Choose a Door setting to update")
         if has_inversion and not has_status:
             raise ServiceValidationError("Choose a status entity before changing its direction")
@@ -236,6 +272,13 @@ def async_register_access_point_actions(
                 response = dict(access_point.to_dict())
             else:
                 response = {}
+            if has_open:
+                summary = await access_point_service.update_open_policy(
+                    access_point_id,
+                    open_enabled=call.data["open_enabled"],
+                    entry_action=call.data["entry_action"],
+                )
+                response = summary.to_dict()
             if has_status:
                 raw_status = call.data.get(ATTR_STATUS_ENTITY_ID)
                 status_entity_id = raw_status.strip() if raw_status else None
@@ -299,6 +342,16 @@ def async_register_access_point_actions(
     async def handle_unlock(call: ServiceCall) -> ServiceResponse:
         return await handle_operation(call, SERVICE_UNLOCK)
 
+    async def handle_open(call: ServiceCall) -> ServiceResponse:
+        return await handle_operation(call, "open")
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_OPEN_ACCESS_POINT,
+        handle_open,
+        schema=ACCESS_POINT_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
     hass.services.async_register(
         DOMAIN,
         SERVICE_LIST_ACCESS_POINTS,
@@ -317,7 +370,7 @@ def async_register_access_point_actions(
         DOMAIN,
         SERVICE_ENROLL_ACCESS_POINT,
         handle_enroll,
-        schema=ACCESS_POINT_SCHEMA,
+        schema=ENROLL_ACCESS_POINT_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(

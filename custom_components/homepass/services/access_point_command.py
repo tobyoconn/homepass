@@ -82,6 +82,10 @@ class AccessPointCommandService:
         if state.availability is not AccessPointAvailability.AVAILABLE:
             return False
         if target.control_profile == "lock":
+            if target.access_point.entry_action == "open" and (
+                not target.access_point.open_enabled or state.supports_open is not True
+            ):
+                return False
             return state.lock_state in {
                 "locked",
                 "locking",
@@ -110,7 +114,7 @@ class AccessPointCommandService:
         person_name: str | None = None,
     ) -> AccessPointCommandResult:
         """Dispatch one generic lock/cover/relay command."""
-        if operation not in {SERVICE_LOCK, SERVICE_UNLOCK}:
+        if operation not in {SERVICE_LOCK, SERVICE_UNLOCK, "open"}:
             raise ValueError("Unsupported access point operation")
         if origin is LockEventOrigin.NFC_PASSKEY and not await self.supports_nfc_access(
             access_point_id
@@ -119,6 +123,23 @@ class AccessPointCommandService:
 
         target = await self._access_points.get_target(access_point_id)
         state = await self._access_points.resolve_state(access_point_id)
+        if (
+            operation == SERVICE_UNLOCK
+            and origin
+            in {
+                LockEventOrigin.NFC_PASSKEY,
+                LockEventOrigin.HOMEPASS_KEYPAD,
+            }
+            and target.control_profile == "lock"
+        ):
+            operation = target.access_point.entry_action
+        if operation == "open" and (
+            target.control_profile != "lock"
+            or not target.access_point.open_enabled
+            or state.supports_open is not True
+            or state.availability is not AccessPointAvailability.AVAILABLE
+        ):
+            raise ValueError("Open Door is not enabled or is currently unavailable")
         no_op = self._already_in_requested_state(target, state.door_state, operation)
         if no_op:
             return AccessPointCommandResult(False, False)
@@ -135,9 +156,13 @@ class AccessPointCommandService:
                 self._lock_correlations.register(
                     access_point_id=target.access_point.id,
                     requested_state=(
-                        LockStableState.LOCKED
-                        if operation == SERVICE_LOCK
-                        else LockStableState.UNLOCKED
+                        LockStableState.OPEN
+                        if operation == "open"
+                        else (
+                            LockStableState.LOCKED
+                            if operation == SERVICE_LOCK
+                            else LockStableState.UNLOCKED
+                        )
                     ),
                     origin=origin,
                     command_id=command_id,
@@ -237,7 +262,9 @@ class AccessPointCommandService:
                 return
             await self._lock_provider.unlock(target.control_entity_id, context=context)
             return
-        if operation == SERVICE_LOCK:
+        if operation == "open":
+            await self._lock_provider.open(target.control_entity_id, context=context)
+        elif operation == SERVICE_LOCK:
             await self._lock_provider.lock(target.control_entity_id, context=context)
         else:
             await self._lock_provider.unlock(target.control_entity_id, context=context)

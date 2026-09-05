@@ -444,6 +444,15 @@ unlock_access_point:
       selector:
         text:
 
+open_access_point:
+  name: Open Door
+  description: Briefly retracts a managed lock's latch, only when Home Assistant supports Open and an administrator has enabled it in HomePASS.
+  fields:
+    access_point_id:
+      required: true
+      selector:
+        text:
+
 give_access:
   name: Give access
   description: >-

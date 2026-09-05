@@ -17,6 +17,8 @@ class AccessPointData(TypedDict):
     enabled: bool
     created_at: str
     updated_at: str
+    open_enabled: bool
+    entry_action: str
 
 
 def _utcnow() -> datetime:
@@ -84,6 +86,8 @@ class AccessPoint:
     enabled: bool = True
     created_at: datetime = field(default_factory=_utcnow)
     updated_at: datetime = field(default_factory=_utcnow)
+    open_enabled: bool = False
+    entry_action: str = "unlock"
 
     def __post_init__(self) -> None:
         """Validate and normalize the access point."""
@@ -97,6 +101,13 @@ class AccessPoint:
             raise ValueError("AccessPoint display_name must not be empty")
         if not isinstance(self.enabled, bool):
             raise TypeError("AccessPoint enabled must be a boolean")
+
+        if not isinstance(self.open_enabled, bool):
+            raise TypeError("Open permission must be a boolean")
+        if self.entry_action not in {"unlock", "open"}:
+            raise ValueError("Entry action must be unlock or open")
+        if self.entry_action == "open" and not self.open_enabled:
+            raise ValueError("Open Door must be enabled before using it for entry")
 
         created_at = _normalize_datetime(self.created_at, "created_at")
         updated_at = _normalize_datetime(self.updated_at, "updated_at")
@@ -115,12 +126,16 @@ class AccessPoint:
             "enabled": self.enabled,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
+            "open_enabled": self.open_enabled,
+            "entry_action": self.entry_action,
         }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> Self:
         """Deserialize and validate an access point."""
         return cls(
+            open_enabled=_require_bool(data.get("open_enabled", False), "open_enabled"),
+            entry_action=_require_string(data.get("entry_action", "unlock"), "entry_action"),
             id=_parse_uuid(_required(data, "id")),
             display_name=_require_string(_required(data, "display_name"), "display_name"),
             enabled=_require_bool(_required(data, "enabled"), "enabled"),

@@ -188,14 +188,17 @@ class BatteryMonitoringService:
                 self._statuses = {
                     entity_id: previous.get(entity_id, reading.status)
                     for entity_id in targets
-                    if (reading := read_battery_source(self._hass, entity_id)) is not None
+                    if (
+                        reading := read_battery_source(self._hass, entity_id, allow_attributes=True)
+                    )
+                    is not None
                 }
         except Exception:  # noqa: BLE001 - monitoring cannot disrupt HomePASS
             _LOGGER.warning("HomePASS could not refresh battery monitoring")
 
     async def _process_state_change(self, entity_id: str, occurred_at: datetime) -> None:
         target = self._targets.get(entity_id)
-        reading = read_battery_source(self._hass, entity_id)
+        reading = read_battery_source(self._hass, entity_id, allow_attributes=True)
         if target is None or reading is None or reading.status is BatteryStatus.UNKNOWN:
             return
         previous = self._statuses.get(entity_id, BatteryStatus.UNKNOWN)

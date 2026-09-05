@@ -64,6 +64,7 @@ class NormalizedPhysicalState(StrEnum):
 
     LOCKED = "locked"
     UNLOCKED = "unlocked"
+    UNLATCHED = "unlatched"
     OPEN = "open"
     CLOSED = "closed"
     TRANSITIONAL = "transitional"
@@ -72,6 +73,7 @@ class NormalizedPhysicalState(StrEnum):
 
 
 _EVENT_TYPES = {
+    NormalizedPhysicalState.UNLATCHED: ActivityEventType.LATCH_RELEASED,
     NormalizedPhysicalState.LOCKED: ActivityEventType.DOOR_LOCKED,
     NormalizedPhysicalState.UNLOCKED: ActivityEventType.DOOR_UNLOCKED,
     NormalizedPhysicalState.OPEN: ActivityEventType.DOOR_OPENED,
@@ -153,6 +155,8 @@ def normalize_physical_state(
     if kind is PhysicalEntityKind.LOCK:
         if state == "locked":
             return NormalizedPhysicalState.LOCKED
+        if state == "open":
+            return NormalizedPhysicalState.UNLATCHED
         if state == "unlocked":
             return NormalizedPhysicalState.UNLOCKED
         if state in _TRANSITIONAL_LOCK_STATES:
@@ -349,9 +353,7 @@ class PhysicalActivityIngestionService:
                 continue
             sources = (
                 (
-                    summary.state.lock_entity_id
-                    if summary.control_profile == "lock"
-                    else None,
+                    summary.state.lock_entity_id if summary.control_profile == "lock" else None,
                     PhysicalEntityKind.LOCK,
                 ),
                 (summary.state.door_entity_id, PhysicalEntityKind.CONTACT),

@@ -166,6 +166,7 @@ _COPY: dict[ActivityEventType, tuple[str, str]] = {
         "Configuration needs attention",
         "HomePASS configuration needs attention.",
     ),
+    ActivityEventType.LATCH_RELEASED: ("Latch released", "{door} latch was released."),
     ActivityEventType.BATTERY_LOW: ("Battery low", "{door} battery is low."),
     ActivityEventType.BATTERY_CRITICAL: (
         "Battery critical",

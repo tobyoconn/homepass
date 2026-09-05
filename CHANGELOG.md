@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added upright dashboard battery indicators for locks, door sensors and accessories, preserving existing door artwork and status markers.
+- Raised low battery to 30%, retained critical at 10%, and repaired alerts for attribute-only battery readings.
+- Added administrator-confirmed Open Door support, Nuki door-fitting recommendations, and separate manual Unlock/Open choices.
+- Applied configured entry actions to HomePASS keypad and NFC requests, and distinguished latch release from physical door opening in Activity.
+- Added backend and executable frontend regression coverage.
+
 ## [1.17.5] - 2026-08-27
 
 ### Fixed

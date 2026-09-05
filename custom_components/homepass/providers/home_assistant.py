@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from homeassistant.components.lock import LockEntityFeature
 from homeassistant.components.lock.const import DOMAIN as LOCK_DOMAIN
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -40,6 +41,16 @@ class HomeAssistantLockProvider:
     async def unlock(self, entity_id: str, *, context: object | None = None) -> None:
         """Dispatch a local Home Assistant unlock command."""
         await self._call(SERVICE_UNLOCK, entity_id, context)
+
+    async def open(self, entity_id: str, *, context: object | None = None) -> None:
+        """Dispatch latch retraction separately from Unlock."""
+        state = self._hass.states.get(entity_id)
+        features = state.attributes.get("supported_features", 0) if state is not None else 0
+        if (state is None or state.state in {STATE_UNKNOWN, STATE_UNAVAILABLE}
+                or not isinstance(features, int) or isinstance(features, bool)
+                or not features & LockEntityFeature.OPEN):
+            raise ValueError("Open Door is currently unavailable")
+        await self._call("open", entity_id, context)
 
     async def _call(self, service: str, entity_id: str, context: object | None) -> None:
         await self._hass.services.async_call(

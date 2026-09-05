@@ -38,6 +38,7 @@ class LockStableState(StrEnum):
 
     LOCKED = "locked"
     UNLOCKED = "unlocked"
+    OPEN = "unlatched"
 
 
 class LockCommandCorrelationError(ValueError):
