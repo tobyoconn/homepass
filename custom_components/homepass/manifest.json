@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/tobyoconn/homepass/issues",
   "requirements": ["cryptography==48.0.1", "webauthn==2.8.0", "qrcode==8.2", "pyNukiBT==0.0.20"],
   "single_config_entry": true,
-  "version": "1.17.5"
+  "version": "1.18.0"
 }
