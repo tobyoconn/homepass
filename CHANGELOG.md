@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.18.4] - 2026-09-07
+
+- NFC tag setup and user enrollment now obtain the secure Nabu Casa address from
+  Home Assistant automatically, without requiring it to be copied into HomePASS.
+- Reuse an existing NFC address unchanged, preserving tags and registered passkeys.
+- If Cloud remote access is unavailable, offer automatic retry and manual HTTPS
+  entry with guidance. Setup remains an administrator action.
+- Added backend and frontend regressions for discovery, saved-address preservation,
+  permissions, manual fallback, delayed startup and leaving setup during a request.
+
 ## [1.18.3] - 2026-09-07
 
 - Replaced the manual Unlock/Open selector and shared confirmation slider with two
