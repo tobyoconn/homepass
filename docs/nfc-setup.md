@@ -13,7 +13,10 @@ Manual addresses must contain no path, query, fragment or sign-in details.
 An address already saved for NFC is reused without a Cloud lookup or replacement.
 This keeps existing physical tags and passkeys tied to the same origin. Merely
 starting HomePASS does not enable NFC; setup requires an administrator action.
-The provider options remain available for deliberate configuration changes.
+The integration's provider options remain available for deliberate configuration
+changes. Choose **NFC access** to review this address independently from the
+**Nuki keypad** connection. When no address has been saved, the NFC form obtains
+and pre-fills the Home Assistant Cloud address automatically.
 
 The `homepass.configure_nfc` action accepts an optional `nfc_public_origin` field:
 omit it to reuse the saved address or discover Cloud; supply it for manual setup.

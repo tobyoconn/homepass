@@ -26,6 +26,9 @@ from .const import (
 
 if TYPE_CHECKING:
     from .services import NukiFingerprintService
+    from .services.nuki_audit_ingestion import NukiAuditIngestionService
+
+_ATTR_REFRESH_FROM_LOCK = "refresh_from_lock"
 
 
 async def _require_admin(hass: HomeAssistant, call: ServiceCall) -> None:
@@ -38,16 +41,27 @@ async def _require_admin(hass: HomeAssistant, call: ServiceCall) -> None:
 
 @callback
 def async_register_nuki_fingerprint_actions(
-    hass: HomeAssistant, service: NukiFingerprintService
+    hass: HomeAssistant,
+    service: NukiFingerprintService,
+    audit_ingestion: NukiAuditIngestionService | None,
 ) -> None:
     """Register the non-biometric enrollment coordination actions."""
 
     async def status(call: ServiceCall) -> ServiceResponse:
         await _require_admin(hass, call)
         try:
+            if call.data[_ATTR_REFRESH_FROM_LOCK]:
+                if audit_ingestion is None:
+                    raise ValueError("Local Nuki audit access is not configured")
+                await audit_ingestion.async_refresh()
             result = await service.status_for_person(UUID(call.data[ATTR_PERSON_ID]))
         except (KeyError, TypeError, ValueError) as err:
             raise ServiceValidationError(str(err)) from err
+        except Exception as err:  # noqa: BLE001 - return a secret-safe UI error
+            raise ServiceValidationError(
+                "HomePASS could not read the Nuki activity log over Bluetooth. "
+                "Check that the lock is nearby and online, then try again."
+            ) from err
         return cast("ServiceResponse", result)
 
     async def start(call: ServiceCall) -> ServiceResponse:
@@ -70,7 +84,12 @@ def async_register_nuki_fingerprint_actions(
             raise ServiceValidationError(str(err)) from err
         return cast("ServiceResponse", result)
 
-    person_schema = vol.Schema({vol.Required(ATTR_PERSON_ID): str})
+    person_schema = vol.Schema(
+        {
+            vol.Required(ATTR_PERSON_ID): str,
+            vol.Optional(_ATTR_REFRESH_FROM_LOCK, default=False): bool,
+        }
+    )
     enrollment_schema = vol.Schema(
         {
             vol.Required(ATTR_PERSON_ID): str,

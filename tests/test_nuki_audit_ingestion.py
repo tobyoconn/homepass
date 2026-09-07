@@ -80,6 +80,22 @@ async def test_uncorrelated_fingerprint_event_records_safe_fallback_activity() -
     )
 
 
+async def test_explicit_refresh_reads_and_processes_new_audit_events() -> None:
+    """The user-facing refresh performs a real Bluetooth audit-log read."""
+    service, _physical, fingerprint, access_point_id = _service(correlated=True)
+    event = ProviderAuditEvent(
+        "55", datetime.now(UTC), "unlock", "success", "17", None, "fingerprint"
+    )
+    service._provider.list_audit_events.return_value = (event,)
+
+    await service.async_refresh()
+
+    service._provider.list_audit_events.assert_awaited_once_with(limit=50)
+    fingerprint.observe_provider_event.assert_awaited_once_with(
+        access_point_id, event, record_activity=False
+    )
+
+
 async def test_failed_or_unidentified_audit_event_is_ignored() -> None:
     """Names never substitute for exact successful authorization evidence."""
     service, physical, fingerprint, _access_point_id = _service()

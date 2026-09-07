@@ -851,6 +851,7 @@ class HomePassPanel extends HTMLElement {
     this._nfcAccessPoints = [];
     this._nukiFingerprintStatus = undefined;
     this._nukiFingerprintLoading = false;
+    this._nukiFingerprintCheckingLock = false;
     this._nukiFingerprintBusyDoorId = undefined;
     this._nukiFingerprintError = undefined;
     this._nukiFingerprintRequestGeneration = 0;
@@ -1973,6 +1974,7 @@ class HomePassPanel extends HTMLElement {
     this._nfcAccessPoints = [];
     this._nukiFingerprintStatus = undefined;
     this._nukiFingerprintLoading = true;
+    this._nukiFingerprintCheckingLock = false;
     this._nukiFingerprintBusyDoorId = undefined;
     this._nukiFingerprintError = undefined;
     this._nukiFingerprintRequestGeneration += 1;
@@ -2079,6 +2081,7 @@ class HomePassPanel extends HTMLElement {
     this._nukiFingerprintRequestGeneration += 1;
     this._nukiFingerprintStatus = undefined;
     this._nukiFingerprintLoading = false;
+    this._nukiFingerprintCheckingLock = false;
     this._nukiFingerprintBusyDoorId = undefined;
     this._nukiFingerprintError = undefined;
     this._personPolicyCurrentAccess = [];
@@ -12467,17 +12470,25 @@ class HomePassPanel extends HTMLElement {
     content.append(details);
   }
 
-  async _loadNukiFingerprintStatus(personId = this._selectedPerson?.person_id) {
-    if (!personId) return;
+  async _loadNukiFingerprintStatus(
+    personId = this._selectedPerson?.person_id,
+    refreshFromLock = false,
+  ) {
+    if (!personId || (refreshFromLock && this._nukiFingerprintLoading)) return;
     const generation = ++this._nukiFingerprintRequestGeneration;
     this._nukiFingerprintLoading = true;
+    this._nukiFingerprintCheckingLock = refreshFromLock;
     this._nukiFingerprintError = undefined;
+    if (refreshFromLock) this._render();
     try {
       const result = await this._hass.callWS({
         type: "call_service",
         domain: DOMAIN,
         service: GET_NUKI_FINGERPRINT_STATUS_ACTION,
-        service_data: { person_id: personId },
+        service_data: {
+          person_id: personId,
+          refresh_from_lock: refreshFromLock,
+        },
         return_response: true,
       });
       if (this._detailsPersonId !== personId ||
@@ -12490,12 +12501,14 @@ class HomePassPanel extends HTMLElement {
     } catch (_error) {
       if (this._detailsPersonId !== personId ||
           generation !== this._nukiFingerprintRequestGeneration) return;
-      this._nukiFingerprintError =
-        "HomePASS could not load Nuki fingerprint status. Try refreshing this user.";
+      this._nukiFingerprintError = refreshFromLock
+        ? "HomePASS could not read the Nuki activity log over Bluetooth. Check that the lock is nearby and online, then try again."
+        : "HomePASS could not load Nuki fingerprint status. Try refreshing this user.";
     } finally {
       if (this._detailsPersonId === personId &&
           generation === this._nukiFingerprintRequestGeneration) {
         this._nukiFingerprintLoading = false;
+        this._nukiFingerprintCheckingLock = false;
         this._render();
       }
     }
@@ -12550,7 +12563,9 @@ class HomePassPanel extends HTMLElement {
     if (this._nukiFingerprintLoading) {
       const loading = document.createElement("p");
       loading.setAttribute("role", "status");
-      loading.textContent = "Loading fingerprint status…";
+      loading.textContent = this._nukiFingerprintCheckingLock
+        ? "Checking recent Nuki activity over Bluetooth…"
+        : "Loading fingerprint status…";
       card.append(loading);
       return card;
     }
@@ -12642,8 +12657,11 @@ class HomePassPanel extends HTMLElement {
         const refresh = document.createElement("ha-button");
         refresh.setAttribute("appearance", "plain");
         refresh.disabled = Boolean(this._nukiFingerprintBusyDoorId);
-        refresh.textContent = "Refresh status";
-        refresh.addEventListener("click", () => void this._loadNukiFingerprintStatus());
+        refresh.textContent = "Check Nuki now";
+        refresh.addEventListener("click", () => void this._loadNukiFingerprintStatus(
+          this._selectedPerson?.person_id,
+          true,
+        ));
         actions.append(refresh);
         section.append(actions);
       }

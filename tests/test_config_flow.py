@@ -2,7 +2,7 @@
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -36,6 +36,21 @@ from custom_components.homepass.providers.nuki_bluetooth import (
 )
 from custom_components.homepass.providers.nuki_local import NukiLocalAuthorizationProvider
 from custom_components.homepass.vault.api import CredentialVault
+
+
+async def _open_options_step(
+    hass: HomeAssistant,
+    entry_id: str,
+    step_id: str,
+):
+    """Open one independently configurable HomePASS provider."""
+    result = await hass.config_entries.options.async_init(entry_id)
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "init"
+    return await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"next_step_id": step_id},
+    )
 
 
 async def test_user_flow(hass: HomeAssistant) -> None:
@@ -108,6 +123,81 @@ async def test_user_flow_uses_default_name(
     assert result["title"] == NAME
 
 
+async def test_options_flow_separates_nfc_and_nuki_configuration(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """NFC and Nuki are independent choices instead of one combined form."""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "init"
+    assert result["menu_options"] == ["nfc", "nuki"]
+
+
+async def test_nfc_options_prefill_cloud_origin_and_preserve_nuki(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """The NFC form discovers Cloud without overwriting unrelated provider options."""
+    lookup = Mock(return_value="https://Example.ui.nabu.casa/")
+    monkeypatch.setattr("custom_components.homepass.config_flow.get_url", lookup)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_INSTANCE_NAME: NAME},
+        options={CONF_NUKI_ENABLED: False},
+    )
+    entry.add_to_hass(hass)
+
+    result = await _open_options_step(hass, entry.entry_id, "nfc")
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "nfc"
+    assert result["data_schema"]({})[CONF_NFC_PUBLIC_ORIGIN] == ("https://example.ui.nabu.casa")
+    assert "automatically" in result["description_placeholders"]["discovery"]
+    lookup.assert_called_once_with(
+        hass,
+        require_cloud=True,
+        require_ssl=True,
+        allow_internal=False,
+        allow_ip=False,
+    )
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_NFC_PUBLIC_ORIGIN: "https://Example.ui.nabu.casa/"},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {
+        CONF_NUKI_ENABLED: False,
+        CONF_NFC_PUBLIC_ORIGIN: "https://example.ui.nabu.casa",
+    }
+
+
+async def test_nfc_options_reuse_saved_origin_without_discovery(
+    hass: HomeAssistant,
+    monkeypatch,
+) -> None:
+    """A deployed NFC origin is shown unchanged and is never rediscovered."""
+    lookup = Mock(side_effect=AssertionError("saved origins must remain stable"))
+    monkeypatch.setattr("custom_components.homepass.config_flow.get_url", lookup)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_INSTANCE_NAME: NAME},
+        options={CONF_NFC_PUBLIC_ORIGIN: "https://access.example.com"},
+    )
+    entry.add_to_hass(hass)
+
+    result = await _open_options_step(hass, entry.entry_id, "nfc")
+
+    assert result["data_schema"]({})[CONF_NFC_PUBLIC_ORIGIN] == ("https://access.example.com")
+    assert "Changing it" in result["description_placeholders"]["discovery"]
+    lookup.assert_not_called()
+
+
 async def test_options_flow_prevents_unrelated_credential_autofill(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -121,11 +211,12 @@ async def test_options_flow_prevents_unrelated_credential_autofill(
     )
     mock_config_entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
-
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nfc")
     assert result["type"] is FlowResultType.FORM
     fields = {marker.schema: field for marker, field in result["data_schema"].schema.items()}
     assert fields[CONF_NFC_PUBLIC_ORIGIN].config["autocomplete"] == "url"
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
+    fields = {marker.schema: field for marker, field in result["data_schema"].schema.items()}
     assert fields[CONF_NUKI_SECURITY_PIN].config["autocomplete"] == "new-password"
 
 
@@ -157,12 +248,11 @@ async def test_options_flow_pairs_nuki_without_storing_security_pin(
         AsyncMock(return_value=()),
     )
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.computer_room_computer_room_smart_lock",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -200,12 +290,11 @@ async def test_options_flow_uses_existing_label_for_pairing_diagnostics(
         ),
     )
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.computer_room",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -238,12 +327,11 @@ async def test_options_flow_contains_unexpected_pairing_failure(
         AsyncMock(side_effect=RuntimeError("upstream detail must remain private")),
     )
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.computer_room",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -294,12 +382,11 @@ async def test_options_flow_retains_existing_nuki_pairing_when_pin_is_blank(
         },
     )
     entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_options_step(hass, entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.computer_room_computer_room_smart_lock",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -356,12 +443,11 @@ async def test_options_flow_reuses_existing_pairing_even_if_pin_is_supplied(
         },
     )
     entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_options_step(hass, entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.computer_room",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -419,12 +505,11 @@ async def test_options_flow_contains_existing_pairing_scan_timeout(
         },
     )
     entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await _open_options_step(hass, entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.computer_room",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -465,12 +550,11 @@ async def test_options_flow_keeps_existing_nuki_pins_by_default(
     remove = AsyncMock()
     monkeypatch.setattr(NukiLocalAuthorizationProvider, "delete_authorization", remove)
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.front_door",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -531,11 +615,10 @@ async def test_initial_pairing_can_delete_every_existing_nuki_pin(
         AsyncMock(return_value=()),
     )
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.front_door",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -597,11 +680,10 @@ async def test_options_flow_deletes_only_selected_existing_nuki_pins(
         AsyncMock(return_value=(existing[1],)),
     )
     mock_config_entry.add_to_hass(hass)
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_LOCK_ENTITY_ID: "lock.front_door",
             CONF_NUKI_BLE_ADDRESS: address,
@@ -691,12 +773,11 @@ async def test_options_flow_requires_complete_nuki_configuration(
         "_discovered_nuki_locks",
         lambda self, current: {},
     )
-    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await _open_options_step(hass, mock_config_entry.entry_id, "nuki")
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
-            CONF_NFC_PUBLIC_ORIGIN: "",
             CONF_NUKI_ENABLED: True,
             CONF_NUKI_BLE_ADDRESS: "",
         },

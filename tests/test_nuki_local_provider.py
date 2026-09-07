@@ -134,6 +134,37 @@ def test_ultra_keypad_command_table_uses_six_digit_security_pin_width() -> None:
     assert encoded[-4:] == (123456).to_bytes(4, "little")
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    (
+        (1, "keypad"),
+        (2, "fingerprint"),
+    ),
+)
+def test_bluetooth_audit_event_classifies_nuki_keypad_source(source: int, expected: str) -> None:
+    """Nuki uses distinct source bytes for PIN and fingerprint actions."""
+    hass = SimpleNamespace(config=SimpleNamespace(time_zone="Asia/Dubai"))
+    transport = NukiBluetoothTransport(hass, "AA:BB:CC:DD:EE:FF", _credential())
+    raw = SimpleNamespace(
+        type=5,
+        data=SimpleNamespace(
+            source=source,
+            completion_status=0,
+            code_id=17,
+            lock_action=1,
+        ),
+        auth_id=(42).to_bytes(4, "little"),
+        timestamp=datetime(2026, 9, 7, 12),
+        index=9,
+        name="Toby",
+    )
+
+    event = transport._audit_event(raw)
+
+    assert event.source == expected
+    assert event.authorization_external_id == "17"
+
+
 async def test_bluetooth_transport_serializes_operations() -> None:
     """Audit polling cannot overlap keypad work on the same Bluetooth lock."""
     hass = SimpleNamespace(config=SimpleNamespace(time_zone="Asia/Dubai"))

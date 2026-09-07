@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.18.5] - 2026-09-07
+
+- Split NFC access and local Nuki keypad settings into focused provider screens.
+  NFC setup now pre-fills the Home Assistant Cloud address when none is saved,
+  while preserving all unrelated provider options.
+- Fixed Nuki Keypad 2 fingerprint actions being misclassified as unknown events.
+  HomePASS now follows Nuki's keypad-source values for PIN and fingerprint use.
+- Replaced the misleading fingerprint **Refresh status** action with **Check Nuki
+  now**. It reads and processes the lock's recent activity over Bluetooth before
+  displaying confirmation, prevents overlapping checks, and reports connection
+  failures clearly.
+- Added backend and executable frontend regressions for provider separation,
+  Cloud prefill, Nuki event classification, explicit audit refresh, and duplicate
+  click protection.
+
 ## [1.18.4] - 2026-09-07
 
 - NFC tag setup and user enrollment now obtain the secure Nabu Casa address from

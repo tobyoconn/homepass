@@ -43,7 +43,9 @@ _NUKI_ACTIONS = {
     5: "lock_n_go_unlatch",
     6: "full_lock",
 }
-_NUKI_SOURCES = {0: "keypad", 1: "fingerprint"}
+# Nuki's keypad-source byte uses 0 for the back/arrow key, 1 for a PIN,
+# and 2 for a fingerprint. Only the latter two identify a credential owner.
+_NUKI_SOURCES = {0: "keypad_back", 1: "keypad", 2: "fingerprint"}
 _MIN_DATE = datetime(2000, 1, 1)
 _MAX_DATE = datetime(2099, 12, 31, 23, 59, 59)
 _NUKI_CONNECT_TIMEOUT = 12.0

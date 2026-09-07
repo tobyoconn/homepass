@@ -11,6 +11,7 @@ from homeassistant import config_entries
 from homeassistant.components import bluetooth
 from homeassistant.core import callback
 from homeassistant.helpers import selector
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import (
     CONF_INSTANCE_NAME,
@@ -116,7 +117,7 @@ class HomePassConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class HomePassOptionsFlow(config_entries.OptionsFlow):
-    """Configure origin-bound NFC/passkey access."""
+    """Configure HomePASS providers independently."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         self._config_entry = config_entry
@@ -127,10 +128,77 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
         self._pending_nuki_delete_authorizations: set[str] = set()
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Let the administrator choose the provider to configure."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["nfc", "nuki"],
+        )
+
+    async def async_step_nfc(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Configure the fixed public HTTPS origin used by NFC passkeys."""
         errors: dict[str, str] = {}
+        saved_origin = str(self._config_entry.options.get(CONF_NFC_PUBLIC_ORIGIN, "")).strip()
+        current = saved_origin
+        discovery = ""
+        if not saved_origin:
+            try:
+                current = normalize_public_origin(
+                    get_url(
+                        self.hass,
+                        require_cloud=True,
+                        require_ssl=True,
+                        allow_internal=False,
+                        allow_ip=False,
+                    )
+                )
+                discovery = "HomePASS found this Home Assistant Cloud address automatically."
+            except NoURLAvailableError, ValueError:
+                discovery = (
+                    "HomePASS could not find a Home Assistant Cloud address. Enable Remote "
+                    "access or enter a public HTTPS origin manually."
+                )
+        else:
+            discovery = (
+                "This saved origin is already used by HomePASS. Changing it can invalidate "
+                "existing NFC tags and passkeys."
+            )
+
+        if user_input is not None:
+            raw_origin = str(user_input.get(CONF_NFC_PUBLIC_ORIGIN, "")).strip()
+            if raw_origin:
+                try:
+                    raw_origin = normalize_public_origin(raw_origin)
+                except ValueError:
+                    errors[CONF_NFC_PUBLIC_ORIGIN] = "invalid_nfc_public_origin"
+            if not errors:
+                options = dict(self._config_entry.options)
+                if raw_origin:
+                    options[CONF_NFC_PUBLIC_ORIGIN] = raw_origin
+                else:
+                    options.pop(CONF_NFC_PUBLIC_ORIGIN, None)
+                return self.async_create_entry(title="", data=options)
+            current = raw_origin
+
+        return self.async_show_form(
+            step_id="nfc",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_NFC_PUBLIC_ORIGIN, default=current): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.URL,
+                            autocomplete="url",
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={"discovery": discovery},
+        )
+
+    async def async_step_nuki(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Configure direct local Nuki keypad management."""
+        errors: dict[str, str] = {}
         pairing_guidance = ""
-        current = str(self._config_entry.options.get(CONF_NFC_PUBLIC_ORIGIN, ""))
         current_nuki_enabled = bool(self._config_entry.options.get(CONF_NUKI_ENABLED, False))
         current_nuki_entity = str(self._config_entry.options.get(CONF_NUKI_LOCK_ENTITY_ID, ""))
         current_nuki_address = str(self._config_entry.options.get(CONF_NUKI_BLE_ADDRESS, ""))
@@ -142,12 +210,6 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             )
         discovered_nuki = self._discovered_nuki_locks(current_nuki_address)
         if user_input is not None:
-            raw_origin = str(user_input.get(CONF_NFC_PUBLIC_ORIGIN, "")).strip()
-            if raw_origin:
-                try:
-                    raw_origin = normalize_public_origin(raw_origin)
-                except ValueError:
-                    errors[CONF_NFC_PUBLIC_ORIGIN] = "invalid_nfc_public_origin"
             nuki_enabled = bool(user_input.get(CONF_NUKI_ENABLED, False))
             nuki_entity = str(user_input.get(CONF_NUKI_LOCK_ENTITY_ID, "")).strip()
             nuki_address = str(user_input.get(CONF_NUKI_BLE_ADDRESS, "")).strip()
@@ -250,7 +312,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                     else:
                         if existing:
                             self._pending_options = {
-                                CONF_NFC_PUBLIC_ORIGIN: raw_origin,
+                                **self._config_entry.options,
                                 CONF_NUKI_ENABLED: True,
                                 CONF_NUKI_LOCK_ENTITY_ID: nuki_entity,
                                 CONF_NUKI_BLE_ADDRESS: nuki_address,
@@ -264,14 +326,13 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
                 return self.async_create_entry(
                     title="",
                     data={
-                        CONF_NFC_PUBLIC_ORIGIN: raw_origin,
+                        **self._config_entry.options,
                         CONF_NUKI_ENABLED: nuki_enabled,
                         CONF_NUKI_LOCK_ENTITY_ID: nuki_entity,
                         CONF_NUKI_BLE_ADDRESS: nuki_address,
                         CONF_NUKI_BLE_CREDENTIAL_ID: credential_id,
                     },
                 )
-            current = raw_origin
             current_nuki_enabled = nuki_enabled
             current_nuki_entity = nuki_entity
             current_nuki_address = nuki_address
@@ -284,15 +345,9 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
             else vol.Optional(CONF_NUKI_LOCK_ENTITY_ID)
         )
         return self.async_show_form(
-            step_id="init",
+            step_id="nuki",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_NFC_PUBLIC_ORIGIN, default=current): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.URL,
-                            autocomplete="url",
-                        )
-                    ),
                     vol.Required(
                         CONF_NUKI_ENABLED, default=current_nuki_enabled
                     ): selector.BooleanSelector(),
@@ -335,7 +390,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
     ) -> ConfigFlowResult:
         """Keep existing Nuki PINs by default and delete only explicit selections."""
         if self._pending_options is None or self._pending_nuki_provider is None:
-            return await self.async_step_init()
+            return await self.async_step_nuki()
 
         errors: dict[str, str] = {}
         known_ids = {record.external_id for record in self._pending_nuki_authorizations}
@@ -388,7 +443,7 @@ class HomePassOptionsFlow(config_entries.OptionsFlow):
     ) -> ConfigFlowResult:
         """Require a separate confirmation before permanently deleting Nuki PINs."""
         if self._pending_options is None or self._pending_nuki_provider is None:
-            return await self.async_step_init()
+            return await self.async_step_nuki()
 
         selected = self._pending_nuki_delete_authorizations
         known = {record.external_id: record for record in self._pending_nuki_authorizations}

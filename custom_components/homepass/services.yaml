@@ -14,12 +14,19 @@ configure_nfc:
 
 get_nuki_fingerprint_status:
   name: Get Nuki fingerprint status
-  description: Returns non-biometric guided enrollment status for one HomePASS User.
+  description: Returns non-biometric guided enrollment status for one HomePASS User, optionally after reading the local Nuki activity log.
   fields:
     person_id:
       required: true
       selector:
         text:
+    refresh_from_lock:
+      name: Check Nuki now
+      description: Read and process recent Nuki activity over Bluetooth before returning the status.
+      required: false
+      default: false
+      selector:
+        boolean:
 
 get_nuki_storage_status:
   name: Get Nuki storage status

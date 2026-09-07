@@ -112,6 +112,11 @@ class NukiAuditIngestionService:
     def _handle_interval(self, _now: Any) -> None:
         self._schedule(self._poll_safely(process=True), "HomePASS Nuki audit refresh")
 
+    async def async_refresh(self) -> None:
+        """Read and process the Nuki audit log now for an explicit user refresh."""
+        async with self._poll_lock:
+            await self._poll(process=True)
+
     def _schedule(self, target: Coroutine[Any, Any, None], name: str) -> None:
         if not self._started:
             target.close()
@@ -131,23 +136,27 @@ class NukiAuditIngestionService:
     async def _poll_safely(self, *, process: bool) -> None:
         try:
             async with self._poll_lock:
-                async with asyncio.timeout(_POLL_TIMEOUT):
-                    events = await self._provider.list_audit_events(limit=50)
-                unseen = tuple(event for event in events if event.external_id not in self._seen)
-                for event in events:
-                    self._seen[event.external_id] = event
-                if len(self._seen) > 200:
-                    newest = sorted(
-                        self._seen.values(),
-                        key=lambda event: event.occurred_at,
-                        reverse=True,
-                    )[:200]
-                    self._seen = {event.external_id: event for event in newest}
-                if process:
-                    for event in sorted(unseen, key=lambda item: item.occurred_at):
-                        await self._process(event)
+                await self._poll(process=process)
         except Exception:  # noqa: BLE001 - audit polling must not disrupt HomePASS
             _LOGGER.warning("HomePASS could not refresh the local Nuki audit log")
+
+    async def _poll(self, *, process: bool) -> None:
+        """Fetch one bounded page and optionally process records not seen before."""
+        async with asyncio.timeout(_POLL_TIMEOUT):
+            events = await self._provider.list_audit_events(limit=50)
+        unseen = tuple(event for event in events if event.external_id not in self._seen)
+        for event in events:
+            self._seen[event.external_id] = event
+        if len(self._seen) > 200:
+            newest = sorted(
+                self._seen.values(),
+                key=lambda event: event.occurred_at,
+                reverse=True,
+            )[:200]
+            self._seen = {event.external_id: event for event in newest}
+        if process:
+            for event in sorted(unseen, key=lambda item: item.occurred_at):
+                await self._process(event)
 
     async def _process(self, event: ProviderAuditEvent) -> None:
         if (

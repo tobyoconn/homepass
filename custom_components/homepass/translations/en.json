@@ -37,22 +37,38 @@
     },
     "step": {
       "init": {
+        "menu_options": {
+          "nfc": "NFC access",
+          "nuki": "Nuki keypad"
+        },
+        "description": "Choose the HomePASS feature you want to configure.",
+        "title": "Configure HomePASS"
+      },
+      "nfc": {
         "data": {
-          "nfc_public_origin": "NFC public origin",
+          "nfc_public_origin": "Public address"
+        },
+        "data_description": {
+          "nfc_public_origin": "The fixed public HTTPS origin used for NFC taps and passkeys. Use the automatically detected Home Assistant Cloud address unless you operate a compatible custom HTTPS domain."
+        },
+        "description": "Configure NFC tags and passkeys independently from keypad providers. {discovery}",
+        "title": "Configure NFC access"
+      },
+      "nuki": {
+        "data": {
           "nuki_enabled": "Manage the Nuki keypad locally",
           "nuki_lock_entity_id": "Nuki Matter lock",
           "nuki_ble_address": "Nearby Nuki lock",
           "nuki_security_pin": "Nuki Security PIN"
         },
         "data_description": {
-          "nfc_public_origin": "The fixed Nabu Casa HTTPS origin used for NFC taps and passkeys. Leave empty to keep NFC disabled.",
           "nuki_enabled": "Home Assistant Matter keeps local lock control. HomePASS uses local Bluetooth for keypad PINs, schedules, and the audit log; no Nuki Web account is needed.",
           "nuki_lock_entity_id": "The lock entity already provided locally by Home Assistant Matter.",
           "nuki_ble_address": "The Nuki must be visible through a connectable Home Assistant Bluetooth adapter. Put it in pairing mode before saving a new pairing.",
           "nuki_security_pin": "The six-digit PIN in the Nuki lock settings. It is encrypted in the HomePASS vault. Leave blank to keep an existing pairing."
         },
-        "description": "Configure optional NFC and direct local Nuki access. For a first Nuki pairing, keep the lock nearby, hold its button for about six seconds, and enter its six-digit Security PIN. {diagnostic}",
-        "title": "Configure HomePASS providers"
+        "description": "Configure direct local Nuki keypad access. For a first pairing, keep the lock nearby, hold its button for about six seconds, and enter its six-digit Security PIN. {diagnostic}",
+        "title": "Configure Nuki keypad"
       },
       "nuki_existing_pins": {
         "data": {
@@ -322,9 +338,10 @@
       "name": "Create NFC passkey enrollment"
     },
     "get_nuki_fingerprint_status": {
-      "description": "Returns non-biometric Nuki fingerprint enrollment status for one HomePASS User.",
+      "description": "Returns non-biometric Nuki fingerprint enrollment status for one HomePASS User, optionally after reading recent lock activity over Bluetooth.",
       "fields": {
-        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"}
+        "person_id": {"description": "The stable HomePASS UUID of the User.", "name": "User ID"},
+        "refresh_from_lock": {"description": "Read and process recent Nuki activity over Bluetooth before returning the status.", "name": "Check Nuki now"}
       },
       "name": "Get Nuki fingerprint status"
     },

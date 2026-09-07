@@ -605,7 +605,11 @@ async def _async_register_entry_surfaces(
     async_register_about_action(hass, runtime.about_service)
     async_register_activity_actions(hass, runtime.activity_read_service)
     async_register_dashboard_attention_actions(hass, runtime.dashboard_attention_service)
-    async_register_nuki_fingerprint_actions(hass, runtime.nuki_fingerprint_service)
+    async_register_nuki_fingerprint_actions(
+        hass,
+        runtime.nuki_fingerprint_service,
+        runtime.nuki_audit_ingestion_service,
+    )
     async_register_nuki_storage_action(
         hass,
         runtime.authorization_provider_registry.get(AccessDriver.NUKI.value),
