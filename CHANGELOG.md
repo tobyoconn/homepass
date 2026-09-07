@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.18.2] - 2026-09-07
+
+- Fixed doors becoming unavailable after saving Door behaviour or enrolling a new
+  door in 1.18.1. The policy reader now accepts the saved Open Door settings as well
+  as legacy records, while continuing to reject invalid or incomplete records.
+- Existing affected doors and their saved entry choices become readable after
+  updating and restarting Home Assistant; no door recreation or data reset is needed.
+- Added persistence regressions covering settings saves, onboarding, door lists,
+  fresh storage loads, retained bindings and strict record validation.
+
 ## [1.18.1] - 2026-09-05
 
 - Corrected the internal version used by About and NFC asset cache refresh.
