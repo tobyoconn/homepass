@@ -12623,6 +12623,22 @@ class HomePassPanel extends HTMLElement {
         help.textContent =
           "Setup is recorded. HomePASS will confirm the link automatically when this fingerprint next unlocks the door through the local Nuki connection.";
         section.append(help);
+        const auditCheck = this._nukiFingerprintStatus?.audit_check;
+        if (auditCheck && Number.isInteger(auditCheck.records_read)) {
+          const checkResult = document.createElement("p");
+          checkResult.className = "nfc-enrollment-note";
+          if (auditCheck.records_read === 0) {
+            checkResult.textContent =
+              "Nuki returned no recent activity. Use the fingerprint to unlock, then check again.";
+          } else if (auditCheck.fingerprint_records === 0) {
+            checkResult.textContent =
+              `Nuki returned ${auditCheck.records_read} recent records: ${auditCheck.pin_records ?? 0} PIN, 0 fingerprint, and ${auditCheck.unrecognized_source_records ?? 0} with an unrecognized source.`;
+          } else {
+            checkResult.textContent =
+              `Nuki returned ${auditCheck.fingerprint_records} fingerprint record${auditCheck.fingerprint_records === 1 ? "" : "s"}, but ${auditCheck.matched_fingerprint_records ?? 0} could be safely matched to this user.`;
+          }
+          section.append(checkResult);
+        }
       } else if (door.status === "confirmed") {
         const confirmed = document.createElement("p");
         confirmed.textContent =

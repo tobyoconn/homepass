@@ -112,10 +112,26 @@ class NukiAuditIngestionService:
     def _handle_interval(self, _now: Any) -> None:
         self._schedule(self._poll_safely(process=True), "HomePASS Nuki audit refresh")
 
-    async def async_refresh(self) -> None:
+    async def async_refresh(self) -> dict[str, int]:
         """Read and reprocess recent Nuki audit records for an explicit refresh."""
         async with self._poll_lock:
-            await self._poll(process=True, include_seen=True)
+            events, matched_fingerprint_records = await self._poll(process=True, include_seen=True)
+        fingerprint_events = tuple(event for event in events if event.source == "fingerprint")
+        return {
+            "records_read": len(events),
+            "pin_records": sum(event.source == "keypad" for event in events),
+            "fingerprint_records": len(fingerprint_events),
+            "successful_fingerprint_records": sum(
+                event.outcome == "success" and event.action in _SUCCESS_ACTIONS
+                for event in fingerprint_events
+            ),
+            "matched_fingerprint_records": matched_fingerprint_records,
+            "unrecognized_source_records": sum(
+                event.source is not None
+                and event.source not in {"keypad_back", "keypad", "fingerprint"}
+                for event in events
+            ),
+        }
 
     def _schedule(self, target: Coroutine[Any, Any, None], name: str) -> None:
         if not self._started:
@@ -140,7 +156,9 @@ class NukiAuditIngestionService:
         except Exception:  # noqa: BLE001 - audit polling must not disrupt HomePASS
             _LOGGER.warning("HomePASS could not refresh the local Nuki audit log")
 
-    async def _poll(self, *, process: bool, include_seen: bool = False) -> None:
+    async def _poll(
+        self, *, process: bool, include_seen: bool = False
+    ) -> tuple[tuple[ProviderAuditEvent, ...], int]:
         """Fetch one bounded page and optionally process records not seen before."""
         async with asyncio.timeout(_POLL_TIMEOUT):
             events = await self._provider.list_audit_events(limit=50)
@@ -154,25 +172,27 @@ class NukiAuditIngestionService:
                 reverse=True,
             )[:200]
             self._seen = {event.external_id: event for event in newest}
+        matched_fingerprint_records = 0
         if process:
             selected = events if include_seen else unseen
             for event in sorted(selected, key=lambda item: item.occurred_at):
-                await self._process(event)
+                matched_fingerprint_records += await self._process(event)
+        return events, matched_fingerprint_records
 
-    async def _process(self, event: ProviderAuditEvent) -> None:
+    async def _process(self, event: ProviderAuditEvent) -> bool:
         if (
             event.outcome != "success"
             or event.action not in _SUCCESS_ACTIONS
             or event.source not in {"keypad", "fingerprint"}
         ):
-            return
+            return False
         authorization_id = event.authorization_external_id
         has_authorization_id = authorization_id is not None and authorization_id.isdecimal()
         if event.source == "keypad" and not has_authorization_id:
-            return
+            return False
         access_point_id = await self._access_point_id()
         if access_point_id is None:
-            return
+            return False
         correlated = False
         if has_authorization_id:
             assert authorization_id is not None
@@ -186,11 +206,12 @@ class NukiAuditIngestionService:
                 self._lock_entity_id, evidence, event.occurred_at
             )
         if event.source == "fingerprint":
-            await self._fingerprint.observe_provider_event(
+            return await self._fingerprint.observe_provider_event(
                 access_point_id,
                 event,
                 record_activity=not correlated,
             )
+        return False
 
     async def _access_point_id(self) -> UUID | None:
         for summary in await self._access_points.list_access_point_summaries():

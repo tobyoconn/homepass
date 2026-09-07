@@ -50,11 +50,14 @@ def async_register_nuki_fingerprint_actions(
     async def status(call: ServiceCall) -> ServiceResponse:
         await _require_admin(hass, call)
         try:
+            audit_check: dict[str, int] | None = None
             if call.data[_ATTR_REFRESH_FROM_LOCK]:
                 if audit_ingestion is None:
                     raise ValueError("Local Nuki audit access is not configured")
-                await audit_ingestion.async_refresh()
+                audit_check = await audit_ingestion.async_refresh()
             result = await service.status_for_person(UUID(call.data[ATTR_PERSON_ID]))
+            if audit_check is not None:
+                result = {**result, "audit_check": audit_check}
         except (KeyError, TypeError, ValueError) as err:
             raise ServiceValidationError(str(err)) from err
         except Exception as err:  # noqa: BLE001 - return a secret-safe UI error

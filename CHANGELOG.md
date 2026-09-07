@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.18.7] - 2026-09-07
+
+- **Check Nuki now** now reports whether the lock returned no recent activity,
+  no fingerprint records, or fingerprint records that could not be safely
+  matched. The diagnostic contains counts only and no PIN or biometric data.
+
 ## [1.18.6] - 2026-09-07
 
 - Fixed Nuki fingerprint confirmation remaining pending after Home Assistant or

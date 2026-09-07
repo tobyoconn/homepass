@@ -45,6 +45,8 @@ def test_person_details_guide_nuki_app_fingerprint_enrollment() -> None:
     assert 'complete.textContent = "I finished in Nuki"' in _SOURCE
     assert 'refresh.textContent = "Check Nuki now"' in _SOURCE
     assert "refresh_from_lock: refreshFromLock" in _SOURCE
+    assert "recent records:" in _SOURCE
+    assert "could be safely matched to this user" in _SOURCE
     assert "never biometric data" in _SOURCE
     assert 'fingerprintMethod.textContent = fingerprint.status === "confirmed"' in _SOURCE
 

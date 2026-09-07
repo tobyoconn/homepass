@@ -37,6 +37,14 @@ async def test_status_refresh_reads_nuki_before_returning(
         "doors": [],
     }
     audit = AsyncMock()
+    audit.async_refresh.return_value = {
+        "records_read": 12,
+        "pin_records": 3,
+        "fingerprint_records": 1,
+        "successful_fingerprint_records": 1,
+        "matched_fingerprint_records": 1,
+        "unrecognized_source_records": 0,
+    }
     async_register_nuki_fingerprint_actions(hass, fingerprint, audit)
 
     try:
@@ -45,6 +53,14 @@ async def test_status_refresh_reads_nuki_before_returning(
         async_unregister_nuki_fingerprint_actions(hass)
 
     assert response["person_id"] == person_id
+    assert response["audit_check"] == {
+        "records_read": 12,
+        "pin_records": 3,
+        "fingerprint_records": 1,
+        "successful_fingerprint_records": 1,
+        "matched_fingerprint_records": 1,
+        "unrecognized_source_records": 0,
+    }
     audit.async_refresh.assert_awaited_once_with()
     fingerprint.status_for_person.assert_awaited_once()
 

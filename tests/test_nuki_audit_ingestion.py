@@ -24,6 +24,7 @@ def _service(*, correlated: bool = True):
     physical = Mock()
     physical.accept_provider_unlock_evidence.return_value = correlated
     fingerprint = AsyncMock()
+    fingerprint.observe_provider_event.return_value = True
     service = NukiAuditIngestionService(
         SimpleNamespace(),
         AsyncMock(),
@@ -88,12 +89,20 @@ async def test_explicit_refresh_reads_and_processes_new_audit_events() -> None:
     )
     service._provider.list_audit_events.return_value = (event,)
 
-    await service.async_refresh()
+    summary = await service.async_refresh()
 
     service._provider.list_audit_events.assert_awaited_once_with(limit=50)
     fingerprint.observe_provider_event.assert_awaited_once_with(
         access_point_id, event, record_activity=False
     )
+    assert summary == {
+        "records_read": 1,
+        "pin_records": 0,
+        "fingerprint_records": 1,
+        "successful_fingerprint_records": 1,
+        "matched_fingerprint_records": 1,
+        "unrecognized_source_records": 0,
+    }
 
 
 async def test_explicit_refresh_reprocesses_an_event_consumed_by_startup_baseline() -> None:
