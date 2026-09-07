@@ -6,7 +6,7 @@ serialx==1.8.2
 home-assistant-frontend==20260729.7
 
 # HomePASS runtime dependencies from the integration manifest.
-cryptography==48.0.1
+cryptography==50.0.0
 webauthn==2.8.0
 qrcode==8.2
 pyNukiBT==0.0.20
