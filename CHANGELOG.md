@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.18.6] - 2026-09-07
+
+- Fixed Nuki fingerprint confirmation remaining pending after Home Assistant or
+  HomePASS restarted. **Check Nuki now** reprocesses the recent lock history,
+  while duplicate Activity entries remain suppressed.
+- Corrected Bluetooth audit parsing so a missing keypad Code ID is no longer
+  replaced with HomePASS's own Bluetooth authorization ID.
+- When Nuki omits the Code ID for a successful fingerprint action, HomePASS can
+  confirm it only if exactly one current fingerprint enrollment is awaiting
+  confirmation on that Door. Ambiguous and mismatched records remain unassigned.
+
 ## [1.18.5] - 2026-09-07
 
 - Split NFC access and local Nuki keypad settings into focused provider screens.

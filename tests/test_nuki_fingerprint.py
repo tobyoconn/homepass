@@ -180,6 +180,106 @@ async def test_matching_fingerprint_event_confirms_owner_and_records_activity(
     assert len(await activity_repository.list_events()) == 1
 
 
+async def test_fingerprint_without_code_id_confirms_the_only_pending_enrollment(
+    hass: HomeAssistant,
+) -> None:
+    """A source-authenticated fingerprint event can confirm one unambiguous setup."""
+    service, _storage, activity_repository, person, door = await _build_service(hass)
+    await service.start(person.person_id, door.id)
+    await service.mark_nuki_app_complete(person.person_id, door.id)
+    event = ProviderAuditEvent(
+        external_id="log-without-code-id",
+        occurred_at=datetime.now(UTC) + timedelta(seconds=1),
+        action="unlock",
+        outcome="success",
+        authorization_external_id=None,
+        authorization_name="Display names are not trusted",
+        source="fingerprint",
+    )
+
+    assert await service.observe_provider_event(door.id, event) is True
+    status = await service.status_for_person(person.person_id)
+    assert status["doors"][0]["status"] == "confirmed"
+    activities = await activity_repository.list_events()
+    assert len(activities) == 1
+    assert activities[0].person_id == person.person_id
+
+
+async def test_fingerprint_without_code_id_does_not_confirm_before_app_step(
+    hass: HomeAssistant,
+) -> None:
+    """ID-free evidence is accepted only in the explicit one-user confirmation window."""
+    service, _storage, activity_repository, person, door = await _build_service(hass)
+    await service.start(person.person_id, door.id)
+    event = ProviderAuditEvent(
+        external_id="log-too-early",
+        occurred_at=datetime.now(UTC) + timedelta(seconds=1),
+        action="unlock",
+        outcome="success",
+        authorization_external_id=None,
+        authorization_name=person.display_name,
+        source="fingerprint",
+    )
+
+    assert await service.observe_provider_event(door.id, event) is False
+    assert await activity_repository.list_events() == ()
+
+
+async def test_fingerprint_without_code_id_does_not_guess_between_pending_users(
+    hass: HomeAssistant,
+) -> None:
+    """ID-free evidence remains unassigned when more than one setup could match."""
+    service, storage, activity_repository, person, door = await _build_service(hass)
+    second_person = Person(display_name="Blair")
+    second_credential_id = VaultCredentialId.new()
+    await PersonRepository(storage).add(second_person)
+    await CredentialMetadataRepository(storage).upsert(
+        CredentialMetadata(
+            credential_id=second_credential_id,
+            person_id=second_person.person_id,
+        )
+    )
+    second_grant = AccessGrant(
+        person_id=second_person.person_id,
+        credential_id=second_credential_id.value,
+        access_point_id=door.id,
+        synchronization_status=SynchronizationStatus.SYNCHRONIZED,
+    )
+    second_metadata = AccessMetadata(
+        person_id=second_person.person_id,
+        access_point_id=door.id,
+        driver=AccessDriver.NUKI,
+        lock_entity_id="lock.front_door",
+        slot=18,
+        synchronization_status=SynchronizationStatus.SYNCHRONIZED,
+        vault_credential_id=second_credential_id,
+    )
+
+    def link_second_user(snapshot: HomePassStorageData) -> None:
+        key = f"{second_person.person_id}:{door.id}"
+        snapshot["data"]["access_grants"][key] = cast("dict[str, object]", second_grant.to_dict())
+        snapshot["data"]["access_metadata"][key] = cast(
+            "dict[str, object]", second_metadata.to_dict()
+        )
+
+    await storage.async_transaction(link_second_user)
+    for candidate in (person, second_person):
+        await service.start(candidate.person_id, door.id)
+        await service.mark_nuki_app_complete(candidate.person_id, door.id)
+    event = ProviderAuditEvent(
+        external_id="log-ambiguous",
+        occurred_at=datetime.now(UTC) + timedelta(seconds=1),
+        action="unlock",
+        outcome="success",
+        authorization_external_id=None,
+        authorization_name=None,
+        source="fingerprint",
+    )
+
+    assert await service.observe_provider_event(door.id, event) is False
+    assert await activity_repository.list_events() == ()
+
+
 async def test_nonmatching_or_nonfingerprint_events_fail_closed(
     hass: HomeAssistant,
 ) -> None:

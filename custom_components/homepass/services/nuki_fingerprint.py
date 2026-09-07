@@ -341,24 +341,48 @@ class NukiFingerprintService:
             or event.source != "fingerprint"
             or event.outcome != "success"
             or event.action not in _SUCCESS_ACTIONS
-            or event.authorization_external_id is None
-            or not event.authorization_external_id.isdecimal()
         ):
             return False
-        slot = int(event.authorization_external_id)
-        person = await self._attribution.resolve_person(access_point_id, slot)
-        if person is None:
-            return False
         snapshot = await self._storage.async_load()
-        access_point = AccessPoint.from_dict(
-            snapshot["data"]["access_points"][str(access_point_id)]
-        )
         records = self._records(snapshot)
-        current = records.get(_key(person.person_id, access_point_id))
-        if current is None or current.authorization_external_id != event.authorization_external_id:
+        external_id = event.authorization_external_id
+        person: Person | None = None
+        current: NukiFingerprintEnrollment | None = None
+        if external_id is not None:
+            if not external_id.isdecimal():
+                return False
+            person = await self._attribution.resolve_person(access_point_id, int(external_id))
+            if person is not None:
+                current = records.get(_key(person.person_id, access_point_id))
+            if current is None or current.authorization_external_id != external_id:
+                return False
+        else:
+            candidates = tuple(
+                record
+                for record in records.values()
+                if record.access_point_id == access_point_id
+                and record.status is NukiFingerprintEnrollmentStatus.ENROLLED_UNVERIFIED
+                and event.occurred_at >= record.updated_at
+                and any(
+                    candidate_access_point.id == access_point_id
+                    and self._matches_authorization(record, metadata)
+                    for metadata, candidate_access_point in self._eligible_targets(
+                        snapshot, record.person_id
+                    )
+                )
+            )
+            if len(candidates) != 1:
+                return False
+            current = candidates[0]
+            person = self._person(snapshot, current.person_id)
+        if current is None or person is None:
             return False
         if event.occurred_at < current.updated_at:
             return False
+        access_point = AccessPoint.from_dict(
+            snapshot["data"]["access_points"][str(access_point_id)]
+        )
+        expected_authorization_id = current.authorization_external_id
         if current.status is not NukiFingerprintEnrollmentStatus.CONFIRMED:
             now = datetime.now(UTC)
 
@@ -368,7 +392,7 @@ class NukiFingerprintService:
                 if not isinstance(raw, Mapping):
                     return
                 latest = NukiFingerprintEnrollment.from_dict(raw)
-                if latest.authorization_external_id != event.authorization_external_id:
+                if latest.authorization_external_id != expected_authorization_id:
                     return
                 raw_records[_key(person.person_id, access_point_id)] = NukiFingerprintEnrollment(
                     person_id=latest.person_id,

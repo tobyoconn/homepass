@@ -165,6 +165,30 @@ def test_bluetooth_audit_event_classifies_nuki_keypad_source(source: int, expect
     assert event.authorization_external_id == "17"
 
 
+def test_bluetooth_keypad_audit_does_not_substitute_client_auth_id() -> None:
+    """A missing Keypad Code ID must not be replaced by HomePASS's Bluetooth app ID."""
+    hass = SimpleNamespace(config=SimpleNamespace(time_zone="Asia/Dubai"))
+    transport = NukiBluetoothTransport(hass, "AA:BB:CC:DD:EE:FF", _credential())
+    raw = SimpleNamespace(
+        type=5,
+        data=SimpleNamespace(
+            source=2,
+            completion_status=0,
+            code_id=0,
+            lock_action=1,
+        ),
+        auth_id=(42).to_bytes(4, "little"),
+        timestamp=datetime(2026, 9, 7, 12),
+        index=10,
+        name="Toby",
+    )
+
+    event = transport._audit_event(raw)
+
+    assert event.source == "fingerprint"
+    assert event.authorization_external_id is None
+
+
 async def test_bluetooth_transport_serializes_operations() -> None:
     """Audit polling cannot overlap keypad work on the same Bluetooth lock."""
     hass = SimpleNamespace(config=SimpleNamespace(time_zone="Asia/Dubai"))

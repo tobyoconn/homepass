@@ -571,12 +571,19 @@ class NukiBluetoothTransport:
         auth_id = int.from_bytes(bytes(raw.auth_id), "little")
         occurred_at = raw.timestamp.replace(tzinfo=self._time_zone).astimezone(UTC)
         action_value = int(data.lock_action) if hasattr(data, "lock_action") else 0
+        authorization_external_id = (
+            str(code_id)
+            if is_keypad and code_id
+            else str(auth_id)
+            if not is_keypad and auth_id
+            else None
+        )
         return ProviderAuditEvent(
             external_id=str(int(raw.index)),
             occurred_at=occurred_at,
             action=_NUKI_ACTIONS.get(action_value, str(action_value)),
             outcome="success" if completion == 0 else "failed",
-            authorization_external_id=str(code_id or auth_id) if code_id or auth_id else None,
+            authorization_external_id=authorization_external_id,
             authorization_name=str(raw.name).strip() or None,
             source=_NUKI_SOURCES.get(source_value, str(source_value))
             if source_value is not None

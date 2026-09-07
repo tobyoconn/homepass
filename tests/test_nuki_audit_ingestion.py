@@ -96,6 +96,37 @@ async def test_explicit_refresh_reads_and_processes_new_audit_events() -> None:
     )
 
 
+async def test_explicit_refresh_reprocesses_an_event_consumed_by_startup_baseline() -> None:
+    """Manual checking can recover an enrollment event hidden by a restart baseline."""
+    service, _physical, fingerprint, access_point_id = _service(correlated=True)
+    event = ProviderAuditEvent(
+        "56", datetime.now(UTC), "unlock", "success", "17", None, "fingerprint"
+    )
+    service._provider.list_audit_events.return_value = (event,)
+
+    await service._poll(process=False)
+    await service.async_refresh()
+
+    fingerprint.observe_provider_event.assert_awaited_once_with(
+        access_point_id, event, record_activity=False
+    )
+
+
+async def test_fingerprint_without_code_id_reaches_safe_enrollment_fallback() -> None:
+    """Some Nuki fingerprint logs omit the linked Keypad Code ID."""
+    service, physical, fingerprint, access_point_id = _service(correlated=True)
+    event = ProviderAuditEvent(
+        "57", datetime.now(UTC), "unlock", "success", None, "Toby", "fingerprint"
+    )
+
+    await service._process(event)
+
+    physical.accept_provider_unlock_evidence.assert_not_called()
+    fingerprint.observe_provider_event.assert_awaited_once_with(
+        access_point_id, event, record_activity=True
+    )
+
+
 async def test_failed_or_unidentified_audit_event_is_ignored() -> None:
     """Names never substitute for exact successful authorization evidence."""
     service, physical, fingerprint, _access_point_id = _service()
