@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.18.3] - 2026-09-07
+
+- Replaced the manual Unlock/Open selector and shared confirmation slider with two
+  directly actionable sliders, retaining the latch descriptions.
+- The primary slider changes from Unlock to Lock once unlocked; Open Door remains a
+  separate action on eligible doors. A released latch can still be locked.
+- Both controls share operation protection, with progress and success shown only on
+  the slider used. Partial gestures and changing door state do not send commands.
+- Added frontend regressions covering actual slider gestures, service dispatch,
+  cancellation, capability changes, concurrent actions, retry and keyboard access.
+
 ## [1.18.2] - 2026-09-07
 
 - Fixed doors becoming unavailable after saving Door behaviour or enrolling a new

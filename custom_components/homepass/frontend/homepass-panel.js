@@ -313,6 +313,7 @@ class HomePassSlideAction extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._label = "Slide to confirm";
+    this._description = "";
     this._disabled = false;
     this._busy = false;
     this._success = false;
@@ -470,6 +471,15 @@ class HomePassSlideAction extends HTMLElement {
 
   get label() {
     return this._label;
+  }
+
+  set description(value) {
+    this._description = String(value ?? "");
+    this._sync();
+  }
+
+  get description() {
+    return this._description;
   }
 
   set disabled(value) {
@@ -646,14 +656,16 @@ class HomePassSlideAction extends HTMLElement {
       this._busy ? "busy" : "",
       this._success ? "success" : "",
     ].filter(Boolean).join(" ");
-    track.setAttribute("aria-label", this._label);
+    track.setAttribute("aria-label", [this._label, this._description].filter(Boolean).join(" — "));
     track.setAttribute(
       "aria-disabled",
       String(this._disabled || this._busy || this._success),
     );
     track.setAttribute("aria-busy", String(this._busy));
     this.shadowRoot.querySelector("#label").textContent = this._label;
-    this.shadowRoot.querySelector("#detail").hidden = !this._busy;
+    const detail = this.shadowRoot.querySelector("#detail");
+    detail.hidden = !this._busy && !this._description;
+    detail.textContent = this._busy ? "Waiting for Home Assistant…" : this._description;
     this.shadowRoot.querySelector("#spinner").hidden = !this._busy;
     this.shadowRoot.querySelector("#check").hidden = !this._success;
     const arrow = this.shadowRoot.querySelector("#arrow");
@@ -2746,7 +2758,6 @@ class HomePassPanel extends HTMLElement {
     this._removeDoorConfirmationOpen = false;
     this._doorControlReturnFocusSelector = returnFocusSelector;
     this._doorControlDialogOpen = true;
-    this._manualEntryChoice = undefined;
     this._openPolicySettingsExpanded = false;
     this._openPolicyNotice = undefined;
     this._openPolicyDrafts = new Map();
@@ -4405,18 +4416,20 @@ class HomePassPanel extends HTMLElement {
     this._doorRelativeTimeTimer = undefined;
   }
 
-  _availableDoorOperation() {
+  _doorHasOpenControl() {
+    return this._selectedDoor?.control_profile === "lock" &&
+      this._selectedDoor.open_enabled && this._selectedDoor.supports_open;
+  }
+
+  _availableDoorOperation(control = "primary") {
     if (this._doorControlLoading || this._doorControlError) return undefined;
     if (this._selectedDoor?.availability !== "available") return undefined;
-    if (this._selectedDoor?.open_enabled && this._selectedDoor?.supports_open &&
-        ["locked", "unlocked"].includes(this._selectedDoor.lock_state)) {
-      if (!this._manualEntryChoice) return undefined;
-      return this._manualEntryChoice === "open"
+    if (control === "open") {
+      return this._doorHasOpenControl() && ["locked", "unlocked"].includes(this._selectedDoor.lock_state)
         ? { action: "open", service: OPEN_ACCESS_POINT_ACTION, targetState: "open" }
-        : { action: this._manualEntryChoice, service: this._manualEntryChoice === "lock" ? LOCK_ACCESS_POINT_ACTION : UNLOCK_ACCESS_POINT_ACTION,
-            targetState: this._manualEntryChoice === "lock" ? "locked" : "unlocked" };
+        : undefined;
     }
-    return this._doorOperationForState(this._selectedDoor);
+    return control === "primary" ? this._doorOperationForSelectedState() : undefined;
   }
 
   _doorOperationForSelectedState() {
@@ -4437,7 +4450,7 @@ class HomePassPanel extends HTMLElement {
         targetState: "unlocked",
       };
     }
-    if (door?.lock_state === "unlocked") {
+    if (door?.lock_state === "unlocked" || (door?.control_profile === "lock" && door.lock_state === "open")) {
       return {
         action: door.control_profile?.startsWith("garage_") ? "close" : "lock",
         service: LOCK_ACCESS_POINT_ACTION,
@@ -4461,28 +4474,40 @@ class HomePassPanel extends HTMLElement {
     ].includes(this._doorOperationState);
   }
 
-  _handleDoorSlideState(event) {
+  _bindDoorSliders() {
+    for (const slider of this.shadowRoot.querySelectorAll("[data-door-slider]")) {
+      const control = slider.dataset.doorSlider;
+      slider.callback = () => void this._beginDoorOperation(control);
+      slider.addEventListener("slide-action-state-changed", (event) => this._handleDoorSlideState(event, control));
+    }
+  }
+
+  _handleDoorSlideState(event, control) {
     if (event.detail?.state === SLIDE_ACTION_STATE.SLIDING) {
+      const operation = this._availableDoorOperation(control);
       if (
-        this._doorOperationState === DOOR_OPERATION_STATE.IDLE ||
-        this._doorOperationState === DOOR_OPERATION_STATE.FAILED
+        operation && [DOOR_OPERATION_STATE.IDLE, DOOR_OPERATION_STATE.FAILED]
+          .includes(this._doorOperationState)
       ) {
         this._doorOperationState = DOOR_OPERATION_STATE.SLIDING;
+        this._doorSlideControl = control;
+        this._doorSlideAction = operation.action;
         this._doorOperationError = undefined;
-        const error = this.shadowRoot.querySelector("#door-operation-error");
-        const remove = this.shadowRoot.querySelector("#open-remove-door-confirmation");
-        if (error) error.hidden = true;
-        if (remove) remove.disabled = true;
+        this._updateDoorOperationControls();
+      } else {
+        event.currentTarget.cancel();
       }
       return;
     }
-    if (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING) {
+    if (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING && this._doorSlideControl === control) {
       this._doorOperationState = DOOR_OPERATION_STATE.IDLE;
+      this._doorSlideControl = undefined;
+      this._doorSlideAction = undefined;
       this._updateDoorOperationControls();
     }
   }
 
-  async _beginDoorOperation() {
+  async _beginDoorOperation(control = "primary") {
     if (
       ![
         DOOR_OPERATION_STATE.IDLE,
@@ -4490,12 +4515,14 @@ class HomePassPanel extends HTMLElement {
         DOOR_OPERATION_STATE.FAILED,
       ].includes(this._doorOperationState) ||
       !this._doorControlDialogOpen ||
-      !this._selectedDoorId
+      !this._selectedDoorId ||
+      (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING && this._doorSlideControl !== control)
     ) {
       return;
     }
-    const operation = this._availableDoorOperation();
-    if (!operation) {
+    const operation = this._availableDoorOperation(control);
+    if (!operation || (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING &&
+        this._doorSlideAction !== operation.action)) {
       this._cancelDoorSlide();
       this._doorOperationState = DOOR_OPERATION_STATE.IDLE;
       this._doorOperationAction = undefined;
@@ -4507,14 +4534,17 @@ class HomePassPanel extends HTMLElement {
       return;
     }
 
+    this._doorSlideControl = undefined;
+    this._doorSlideAction = undefined;
     await this._startDoorOperation(
       this._selectedDoor,
       this._selectedDoorId,
       operation,
+      control,
     );
   }
 
-  async _startDoorOperation(door, accessPointId, requestedOperation = undefined) {
+  async _startDoorOperation(door, accessPointId, requestedOperation = undefined, control = "primary") {
     if (
       [DOOR_OPERATION_STATE.COMMAND_SENT, DOOR_OPERATION_STATE.WAITING_FOR_CONFIRMATION]
         .includes(this._doorOperationState) ||
@@ -4529,6 +4559,7 @@ class HomePassPanel extends HTMLElement {
     const selectedDoorId = accessPointId;
     this._doorOperationState = DOOR_OPERATION_STATE.COMMAND_SENT;
     this._doorOperationAction = operation.action;
+    this._doorOperationControl = control;
     this._doorOperationTargetState = operation.targetState;
     this._doorOperationAccessPointId = selectedDoorId;
     this._doorOperationError = undefined;
@@ -4643,7 +4674,6 @@ class HomePassPanel extends HTMLElement {
     if (!this._doorOperationOwns(generation)) return;
     this._clearDoorOperationTimeout();
     this._doorOperationState = DOOR_OPERATION_STATE.SUCCESS;
-    this._manualEntryChoice = undefined;
     this._doorOperationError = undefined;
     this._updateDoorOperationSurfaces();
     this._doorOperationSuccessTimer = window.setTimeout(() => {
@@ -4678,58 +4708,60 @@ class HomePassPanel extends HTMLElement {
   _updateDoorOperationControls() {
     if (!this._doorControlDialogOpen || this._removeDoorConfirmationOpen) return;
     const region = this.shadowRoot.querySelector("#door-operation-region");
-    const slider = this.shadowRoot.querySelector("#door-slide-action");
     const error = this.shadowRoot.querySelector("#door-operation-error");
     const errorTitle = this.shadowRoot.querySelector("#door-operation-error-title");
     const errorMessage = this.shadowRoot.querySelector("#door-operation-error-message");
     const remove = this.shadowRoot.querySelector("#open-remove-door-confirmation");
-    if (!region || !slider || !error) return;
+    if (!region || !error) return;
 
-    const choice = this.shadowRoot.querySelector("#door-open-choice");
-    if (choice) {
-      choice.hidden = !(this._selectedDoor?.open_enabled && this._selectedDoor?.supports_open);
-      choice.querySelectorAll("button").forEach((button) => {
-        button.disabled = this._doorOperationIsBusy() || this._selectedDoor?.availability !== "available";
-        if (button.dataset.manualEntry === "lock") button.hidden = this._selectedDoor?.lock_state !== "unlocked";
-      });
-    }
-    const available = this._availableDoorOperation();
-    const unavailable = Boolean(this._doorControlLoading || this._doorControlError);
-    const unavailableOperation = unavailable
-      ? this._doorOperationForSelectedState()
-      : undefined;
+    const unavailable = Boolean(this._doorControlLoading || this._doorControlError ||
+      this._selectedDoor?.availability !== "available");
     const active = this._doorOperationAccessPointId === this._selectedDoorId;
-    const busy = active && this._doorOperationCommandIsPending();
+    const pending = this._doorOperationCommandIsPending();
     const anotherDoorBusy = !active && this._doorOperationCommandIsPending();
     const success = active && this._doorOperationState === DOOR_OPERATION_STATE.SUCCESS;
     const failed = active && this._doorOperationState === DOOR_OPERATION_STATE.FAILED;
-    const action = busy || success
-      ? this._doorOperationAction
-      : available?.action ?? unavailableOperation?.action;
-    const showSlider = Boolean(available || unavailableOperation || busy || success);
-    region.hidden = !showSlider && !failed;
-    slider.hidden = !showSlider;
     error.hidden = !failed || !this._doorOperationError;
     errorTitle.textContent = this._doorOperationError?.title ?? "";
     errorMessage.textContent = this._doorOperationError?.message ?? "";
-    if (remove) remove.disabled = this._doorOperationCommandIsPending() || success;
+    if (remove) remove.disabled = this._doorOperationIsBusy() || success;
 
-    if (!showSlider || !action) return;
-    if (anotherDoorBusy) {
-      slider.label = "Another door is updating";
-    } else if (unavailable) {
-      slider.label = "Status unavailable";
-    } else if (success) {
-      slider.label = ({ unlock: "Unlocked", lock: "Locked", open: "Opened", close: "Closed", release: "Released", operate: "Activated" })[action];
-    } else if (busy) {
-      slider.label = ({ unlock: "Unlocking…", lock: "Locking…", open: "Opening…", close: "Closing…", release: "Releasing…", operate: "Activating…" })[action];
-    } else {
-      slider.label = ({ unlock: "Slide to Unlock", lock: "Slide to Lock", open: "Slide to Open", close: "Slide to Close", release: "Slide to Release", operate: "Slide to Activate" })[action];
+    let visible = false;
+    for (const slider of this.shadowRoot.querySelectorAll("[data-door-slider]")) {
+      const control = slider.dataset.doorSlider;
+      const ownsOperation = active && this._doorOperationControl === control;
+      const busy = ownsOperation && pending;
+      const succeeded = ownsOperation && success;
+      const operation = control === "open"
+        ? (this._doorHasOpenControl() ? { action: "open" } : undefined)
+        : this._doorOperationForSelectedState();
+      const action = busy || succeeded ? this._doorOperationAction : operation?.action;
+      const available = this._availableDoorOperation(control);
+      slider.hidden = !action;
+      visible ||= !slider.hidden;
+      const disabled = !available || pending || success ||
+        (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING && this._doorSlideControl !== control);
+      if (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING && this._doorSlideControl === control &&
+          (disabled || action !== this._doorSlideAction)) {
+        this._cancelDoorSlide();
+        return this._updateDoorOperationControls();
+      }
+      let label = ({ unlock: "Slide to Unlock", lock: "Slide to Lock", open: "Slide to Open", close: "Slide to Close", release: "Slide to Release", operate: "Slide to Activate" })[action] ?? "Status unavailable";
+      if (control === "open") label = "Slide to Open Door";
+      if (anotherDoorBusy) label = "Another door is updating";
+      else if (busy) label = ({ unlock: "Unlocking…", lock: "Locking…", open: "Opening…", close: "Closing…", release: "Releasing…", operate: "Activating…" })[action];
+      else if (succeeded) label = control === "open" ? "Latch released" : ({ unlock: "Unlocked", lock: "Locked", open: "Opened", close: "Closed", release: "Released", operate: "Activated" })[action];
+      else if (unavailable) label = "Status unavailable";
+      slider.label = label;
+      slider.description = control === "open" ? "Briefly retract the latch"
+        : action === "unlock" && this._doorHasOpenControl() ? "Leave the latch engaged" : "";
+      slider.direction = "right";
+      // Reapplying false busy/success resets drag progress in the shared component.
+      if (slider.disabled !== disabled) slider.disabled = disabled;
+      if (slider.busy !== busy) slider.busy = busy;
+      if (slider.success !== succeeded) slider.success = succeeded;
     }
-    slider.direction = "right";
-    slider.disabled = unavailable || anotherDoorBusy || (!available && !busy && !success);
-    slider.busy = busy;
-    slider.success = success;
+    region.hidden = !visible && !failed;
   }
 
   _clearDoorOperationTimeout() {
@@ -4747,10 +4779,12 @@ class HomePassPanel extends HTMLElement {
   }
 
   _cancelDoorSlide() {
-    this.shadowRoot?.querySelector?.("#door-slide-action")?.cancel?.();
     if (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING) {
       this._doorOperationState = DOOR_OPERATION_STATE.IDLE;
     }
+    this._doorSlideControl = undefined;
+    this._doorSlideAction = undefined;
+    this.shadowRoot?.querySelectorAll?.("[data-door-slider]").forEach((slider) => slider.cancel());
   }
 
   _resetDoorOperation() {
@@ -6178,14 +6212,8 @@ class HomePassPanel extends HTMLElement {
   }
 
   _render() {
-    const previousDoorSlideAction = this.shadowRoot.querySelector("#door-slide-action");
-    const restoreDoorSlideFocus = Boolean(
-      previousDoorSlideAction &&
-      (
-        this.shadowRoot.activeElement === previousDoorSlideAction ||
-        previousDoorSlideAction.shadowRoot?.activeElement
-      ),
-    );
+    const restoreDoorSlideFocus = Array.from(this.shadowRoot.querySelectorAll("[data-door-slider]"))
+      .find((slider) => this.shadowRoot.activeElement === slider || slider.shadowRoot?.activeElement)?.id;
     if (this._doorOperationState === DOOR_OPERATION_STATE.SLIDING) {
       this._cancelDoorSlide();
     }
@@ -8398,8 +8426,7 @@ class HomePassPanel extends HTMLElement {
         .dashboard-battery-body { position: absolute; inset: 2px 0 0; border: 1.5px solid currentColor; border-radius: 2px; overflow: hidden; }
         .dashboard-battery-fill { position: absolute; bottom: 0; left: 0; width: 100%; background: currentColor; }
         .battery-unknown { display: block; font-size: 10px; line-height: 13px; text-align: center; }
-        .door-open-choice, .open-policy { display: grid; gap: 10px; margin-block: 12px; }
-        .door-open-choice button { padding: 12px; border: 1px solid var(--divider-color); border-radius: 8px; background: var(--card-background-color); color: var(--primary-text-color); cursor: pointer; }
+        .open-policy { display: grid; gap: 10px; margin-block: 12px; }
         .device-battery {
           display: inline-flex;
           align-items: center;
@@ -9903,22 +9930,10 @@ class HomePassPanel extends HTMLElement {
             void this._saveDoorName();
           }
         });
-        const slideAction = this.shadowRoot.querySelector("#door-slide-action");
-        slideAction.callback = () => void this._beginDoorOperation();
-        slideAction.addEventListener(
-          "slide-action-state-changed",
-          (event) => this._handleDoorSlideState(event),
-        );
-        this.shadowRoot.querySelectorAll("[data-manual-entry]").forEach((button) => {
-          button.addEventListener("click", () => {
-            if (this._doorOperationIsBusy()) return;
-            this._manualEntryChoice = button.dataset.manualEntry;
-            this._updateDoorOperationControls();
-          });
-        });
+        this._bindDoorSliders();
         this._bindOpenPolicy("settings");
         this._updateDoorControlDialog();
-        if (restoreDoorSlideFocus) slideAction.focus();
+        if (restoreDoorSlideFocus) this.shadowRoot.querySelector(`#${restoreDoorSlideFocus}`)?.focus();
       }
     }
     if (this._removeDoorConfirmationOpen) {
@@ -10558,21 +10573,17 @@ class HomePassPanel extends HTMLElement {
                 </div>
               </div>
             </section>
-            <div id="door-open-choice" class="door-open-choice" hidden>
-              <p>Choose what should happen this time.</p>
-              <button type="button" data-manual-entry="unlock">Unlock — leave the latch engaged</button>
-              <button type="button" data-manual-entry="open">Open Door — briefly retract the latch</button>
-              <button type="button" data-manual-entry="lock">Lock</button>
-            </div>
-            ${this._hass?.user?.is_admin ? this._openPolicyMarkup(this._selectedDoor, "settings") : ""}
             <div id="door-operation-region" class="door-operation-region" hidden>
-              <${SLIDE_ACTION_WEB_COMPONENT} id="door-slide-action">
+              <${SLIDE_ACTION_WEB_COMPONENT} id="door-slide-action" data-door-slider="primary">
+              </${SLIDE_ACTION_WEB_COMPONENT}>
+              <${SLIDE_ACTION_WEB_COMPONENT} id="door-open-slide-action" data-door-slider="open" hidden>
               </${SLIDE_ACTION_WEB_COMPONENT}>
               <div id="door-operation-error" class="door-operation-error" role="alert" hidden>
                 <p id="door-operation-error-title" class="door-operation-error-title"></p>
                 <p id="door-operation-error-message"></p>
               </div>
             </div>
+            ${this._hass?.user?.is_admin ? this._openPolicyMarkup(this._selectedDoor, "settings") : ""}
             ${this._hass?.user?.is_admin ? `<div class="door-quick-actions">
               <button id="open-door-nfc-setup" class="door-nfc-action" type="button">
                 <span class="door-nfc-action-mark" aria-hidden="true">
@@ -10852,7 +10863,6 @@ class HomePassPanel extends HTMLElement {
       await this._hass.callWS({ type: "call_service", domain: DOMAIN, service: UPDATE_ACCESS_POINT_ACTION,
         service_data: { access_point_id: door.id, open_enabled: draft.enabled, entry_action: draft.entry }, return_response: true });
       this._openPolicyNotice = "Door behaviour saved.";
-      this._manualEntryChoice = undefined;
       draft.confirmed = false;
       await this._loadDashboardAccessPoints({ render: false });
     } catch (_error) { this._openPolicyNotice = "Door behaviour could not be saved. Check that Open Door is still supported and try again."; }
@@ -11586,7 +11596,8 @@ class HomePassPanel extends HTMLElement {
         ? ({ closed: "locked", open: "unlocked" })[liveLock?.state] === door.lock_state
         : Boolean(liveLock);
     const stateCanOperate = ["electric_strike", "garage_toggle"].includes(door?.control_profile) && !door?.door_entity_id
-      ? true : ["locked", "unlocked"].includes(door?.lock_state);
+      ? true : ["locked", "unlocked"].includes(door?.lock_state) ||
+        (door?.control_profile === "lock" && door.lock_state === "open");
     return Boolean(
       door?.enabled === true &&
       door.availability === "available" &&
@@ -11608,7 +11619,7 @@ class HomePassPanel extends HTMLElement {
     const confirmationRequired = ["unlock", "open", "release", "operate"].includes(
       operation?.action,
     );
-    const actionLabel = door.open_enabled && door.supports_open ? "Choose action" : ({
+    const actionLabel = door.open_enabled && door.supports_open ? "Door controls" : ({
       lock: "Lock",
       unlock: "Unlock",
       open: "Open",
@@ -17011,4 +17022,3 @@ if (!customElements.get(SLIDE_ACTION_WEB_COMPONENT)) {
 if (!customElements.get(PANEL_WEB_COMPONENT)) {
   customElements.define(PANEL_WEB_COMPONENT, class extends HomePassPanel {});
 }
-
