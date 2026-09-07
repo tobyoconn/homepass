@@ -2,12 +2,12 @@ ping:
 
 configure_nfc:
   name: Configure NFC
-  description: Saves the public HTTPS address required for NFC tags and passkey enrollment.
+  description: Sets up NFC using the saved address or discovers the Home Assistant Cloud address. Supply an address to set it manually.
   fields:
     nfc_public_origin:
       name: Nabu Casa HTTPS address
-      description: The fixed public HTTPS origin used for NFC taps and passkeys.
-      required: true
+      description: Optional manual address. Omit to reuse the saved origin or discover the Cloud address without changing an existing origin.
+      required: false
       selector:
         text:
           type: url

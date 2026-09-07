@@ -776,6 +776,7 @@ class HomePassPanel extends HTMLElement {
     this._doorSensorError = undefined;
     this._doorSensorNotice = undefined;
     this._doorNfcSetupOpen = false;
+    this._doorNfcConfigurationRequest = undefined;
     this._doorNfcOriginDraft = "";
     this._doorNfcConfiguring = false;
     this._doorNfcConfigurationError = undefined;
@@ -838,6 +839,7 @@ class HomePassPanel extends HTMLElement {
     this._nfcEnrollmentQr = undefined;
     this._nfcEnrollmentExpiresAt = undefined;
     this._nfcEnrollmentSetupOpen = false;
+    this._nfcEnrollmentConfigurationRequest = undefined;
     this._nfcEnrollmentOriginDraft = "";
     this._nfcEnrollmentConfiguring = false;
     this._nfcEnrollmentConfigurationError = undefined;
@@ -1959,6 +1961,7 @@ class HomePassPanel extends HTMLElement {
     this._nfcEnrollmentQr = undefined;
     this._nfcEnrollmentExpiresAt = undefined;
     this._nfcEnrollmentSetupOpen = false;
+    this._nfcEnrollmentConfigurationRequest = undefined;
     this._nfcEnrollmentOriginDraft = "";
     this._nfcEnrollmentConfiguring = false;
     this._nfcEnrollmentConfigurationError = undefined;
@@ -2064,6 +2067,7 @@ class HomePassPanel extends HTMLElement {
     this._nfcEnrollmentQr = undefined;
     this._nfcEnrollmentExpiresAt = undefined;
     this._nfcEnrollmentSetupOpen = false;
+    this._nfcEnrollmentConfigurationRequest = undefined;
     this._nfcEnrollmentOriginDraft = "";
     this._nfcEnrollmentConfiguring = false;
     this._nfcEnrollmentConfigurationError = undefined;
@@ -2748,6 +2752,7 @@ class HomePassPanel extends HTMLElement {
     this._doorSensorError = undefined;
     this._doorSensorNotice = undefined;
     this._doorNfcSetupOpen = false;
+    this._doorNfcConfigurationRequest = undefined;
     this._doorNfcTags = [];
     this._doorNfcTagsLoading = true;
     this._doorNfcTagsError = undefined;
@@ -2826,6 +2831,7 @@ class HomePassPanel extends HTMLElement {
     this._doorSensorError = undefined;
     this._doorSensorNotice = undefined;
     this._doorNfcSetupOpen = false;
+    this._doorNfcConfigurationRequest = undefined;
     this._doorNfcTags = [];
     this._doorNfcTagsLoading = false;
     this._doorNfcTagsError = undefined;
@@ -2978,10 +2984,14 @@ class HomePassPanel extends HTMLElement {
     this._doorNfcConfigurationNotice = undefined;
     this._doorNfcSetupOpen = true;
     this._render();
+    if (!this._hass?.services?.[DOMAIN]?.[LIST_NFC_TAGS_ACTION]) {
+      return this._configureDoorNfc({ automatic: true });
+    }
   }
 
   _closeDoorNfcSetup() {
     this._doorNfcSetupOpen = false;
+    this._doorNfcConfigurationRequest = undefined;
     this._doorNfcOriginDraft = "";
     this._doorNfcConfiguring = false;
     this._doorNfcConfigurationError = undefined;
@@ -2990,7 +3000,7 @@ class HomePassPanel extends HTMLElement {
     requestAnimationFrame(() => this.shadowRoot.querySelector("#open-door-nfc-setup")?.focus());
   }
 
-  async _configureDoorNfc() {
+  async _configureDoorNfc({ automatic = false } = {}) {
     if (this._doorNfcConfiguring || !this._hass?.user?.is_admin) return;
     const publicOrigin = this._doorNfcOriginDraft.trim();
     let parsed;
@@ -2999,7 +3009,7 @@ class HomePassPanel extends HTMLElement {
     } catch (_error) {
       parsed = undefined;
     }
-    if (
+    if (!automatic && (
       !parsed ||
       parsed.protocol !== "https:" ||
       !parsed.hostname ||
@@ -3008,7 +3018,7 @@ class HomePassPanel extends HTMLElement {
       parsed.hash ||
       parsed.username ||
       parsed.password
-    ) {
+    )) {
       this._doorNfcConfigurationError =
         "Enter the Nabu Casa HTTPS address without a path, query, or sign-in details.";
       this._doorNfcConfigurationNotice = undefined;
@@ -3016,36 +3026,53 @@ class HomePassPanel extends HTMLElement {
       return;
     }
     this._doorNfcConfiguring = true;
+    const request = {};
+    this._doorNfcConfigurationRequest = request;
     this._doorNfcConfigurationError = undefined;
-    this._doorNfcConfigurationNotice = undefined;
+    this._doorNfcConfigurationNotice = automatic
+      ? "Finding your secure address in Home Assistant…" : "Saving your secure address…";
     this._render();
     try {
-      await this._hass.callWS({
+      const result = await this._hass.callWS({
         type: "call_service",
         domain: DOMAIN,
         service: CONFIGURE_NFC_ACTION,
-        service_data: { nfc_public_origin: publicOrigin },
+        service_data: automatic ? {} : { nfc_public_origin: publicOrigin },
         return_response: true,
       });
+      if (this._doorNfcConfigurationRequest !== request) return;
+      if (!result.response?.public_origin) {
+        this._doorNfcConfigurationError =
+          "HomePASS could not find your Cloud address. In Home Assistant, open Settings → Home Assistant Cloud, enable Remote access, then try again or enter the HTTPS address below.";
+        this._doorNfcConfigurationNotice = undefined;
+        return;
+      }
+      this._doorNfcOriginDraft = result.response.public_origin;
       this._doorNfcConfigurationNotice = "Address saved. HomePASS is enabling NFC…";
       this._render();
       const deadline = Date.now() + 15000;
       while (Date.now() < deadline) {
+        if (this._doorNfcConfigurationRequest !== request) return;
         if (this._hass?.services?.[DOMAIN]?.[LIST_NFC_TAGS_ACTION]) {
           this._doorNfcConfigurationNotice = undefined;
           return;
         }
         await new Promise((resolve) => window.setTimeout(resolve, 500));
       }
+      if (this._doorNfcConfigurationRequest !== request) return;
       this._doorNfcConfigurationNotice =
         "The address is saved. HomePASS is still restarting NFC; close and reopen this Door in a moment.";
     } catch (_error) {
+      if (this._doorNfcConfigurationRequest !== request) return;
       this._doorNfcConfigurationError =
-        "HomePASS could not save this address. Check it and try again.";
+        automatic ? "HomePASS could not check the Cloud address. Try again or enter the HTTPS address below."
+          : "HomePASS could not save this address. Check it and try again.";
       this._doorNfcConfigurationNotice = undefined;
     } finally {
-      this._doorNfcConfiguring = false;
-      if (this._doorControlDialogOpen && this._doorNfcSetupOpen) this._render();
+      if (this._doorNfcConfigurationRequest === request) {
+        this._doorNfcConfiguring = false;
+        if (this._doorControlDialogOpen && this._doorNfcSetupOpen) this._render();
+      }
     }
   }
 
@@ -9848,6 +9875,9 @@ class HomePassPanel extends HTMLElement {
         this.shadowRoot
           .querySelector("#save-door-nfc-configuration")
           ?.addEventListener("click", () => void this._configureDoorNfc());
+        this.shadowRoot
+          .querySelector("#retry-door-nfc-discovery")
+          ?.addEventListener("click", () => void this._configureDoorNfc({ automatic: true }));
       } else {
         this.shadowRoot
           .querySelector("#refresh-door-control")
@@ -10491,23 +10521,24 @@ class HomePassPanel extends HTMLElement {
               ></${NFC_PROVISIONER_WEB_COMPONENT}>` : `
               <section class="door-nfc-tags" aria-labelledby="nfc-setup-required-title">
                 <h3 id="nfc-setup-required-title">NFC setup required</h3>
+                ${this._doorNfcConfiguring ? `<p role="status">${escapeHtml(this._doorNfcConfigurationNotice)}</p>` : `
                 <p>HomePASS needs the secure Nabu Casa HTTPS address before it can create
                   an NFC tag for this Door.</p>
-                <label>Nabu Casa HTTPS address
+                ${this._doorNfcConfigurationError ? `<p class="form-error" role="alert">${escapeHtml(this._doorNfcConfigurationError)}</p>` : ""}
+                <div class="wizard-field">
+                  <label for="door-nfc-public-origin">Nabu Casa HTTPS address</label>
                   <input id="door-nfc-public-origin" type="url" autocomplete="url"
                     placeholder="https://example.ui.nabu.casa"
-                    value="${escapeHtml(this._doorNfcOriginDraft)}"
-                    ${this._doorNfcConfiguring ? "disabled" : ""} />
-                </label>
+                    value="${escapeHtml(this._doorNfcOriginDraft)}" />
+                </div>
                 <p class="muted">In Home Assistant, open Settings → Home Assistant Cloud to find this address.</p>
-                ${this._doorNfcConfigurationError ? `<p class="form-error" role="alert">${escapeHtml(this._doorNfcConfigurationError)}</p>` : ""}
                 ${this._doorNfcConfigurationNotice ? `<p class="door-rename-feedback notice" role="status">${escapeHtml(this._doorNfcConfigurationNotice)}</p>` : ""}
                 <div class="settings-actions">
+                  <ha-button id="retry-door-nfc-discovery" appearance="plain">Try automatic setup again</ha-button>
                   <ha-button id="save-door-nfc-configuration" appearance="filled"
-                    ${this._doorNfcConfiguring || !this._doorNfcOriginDraft.trim() ? "disabled" : ""}>
-                    ${this._doorNfcConfiguring ? "Enabling NFC…" : "Continue"}
+                    ${!this._doorNfcOriginDraft.trim() ? "disabled" : ""}>Continue
                   </ha-button>
-                </div>
+                </div>`}
               </section>`}
           </div>
           <ha-dialog-footer slot="footer">
@@ -12766,7 +12797,7 @@ class HomePassPanel extends HTMLElement {
 
   async _createNfcEnrollment() {
     const personId = this._selectedPerson?.person_id;
-    if (!personId || this._nfcEnrollmentBusy) return;
+    if (!personId || this._nfcEnrollmentBusy || this._nfcEnrollmentConfiguring) return;
     if (!this._nfcEnrollmentServicesAvailable()) {
       this._nfcEnrollmentSetupOpen = true;
       this._nfcEnrollmentOriginDraft = "";
@@ -12774,9 +12805,7 @@ class HomePassPanel extends HTMLElement {
       this._nfcEnrollmentConfigurationNotice = undefined;
       this._nfcEnrollmentError = undefined;
       this._render();
-      requestAnimationFrame(() =>
-        this.shadowRoot.querySelector("#user-nfc-public-origin")?.focus());
-      return;
+      return this._configureNfcEnrollment({ automatic: true });
     }
     this._nfcEnrollmentBusy = true;
     this._nfcEnrollmentError = undefined;
@@ -12814,13 +12843,14 @@ class HomePassPanel extends HTMLElement {
   _cancelNfcEnrollmentSetup() {
     if (this._nfcEnrollmentConfiguring) return;
     this._nfcEnrollmentSetupOpen = false;
+    this._nfcEnrollmentConfigurationRequest = undefined;
     this._nfcEnrollmentOriginDraft = "";
     this._nfcEnrollmentConfigurationError = undefined;
     this._nfcEnrollmentConfigurationNotice = undefined;
     this._render();
   }
 
-  async _configureNfcEnrollment() {
+  async _configureNfcEnrollment({ automatic = false } = {}) {
     const personId = this._selectedPerson?.person_id;
     if (!personId || this._nfcEnrollmentConfiguring || !this._hass?.user?.is_admin) return;
     const publicOrigin = this._nfcEnrollmentOriginDraft.trim();
@@ -12830,7 +12860,7 @@ class HomePassPanel extends HTMLElement {
     } catch (_error) {
       parsed = undefined;
     }
-    if (
+    if (!automatic && (
       !parsed ||
       parsed.protocol !== "https:" ||
       !parsed.hostname ||
@@ -12839,7 +12869,7 @@ class HomePassPanel extends HTMLElement {
       parsed.hash ||
       parsed.username ||
       parsed.password
-    ) {
+    )) {
       this._nfcEnrollmentConfigurationError =
         "Enter the Nabu Casa HTTPS address without a path, query, or sign-in details.";
       this._nfcEnrollmentConfigurationNotice = undefined;
@@ -12847,43 +12877,62 @@ class HomePassPanel extends HTMLElement {
       return;
     }
     this._nfcEnrollmentConfiguring = true;
+    const request = {};
+    this._nfcEnrollmentConfigurationRequest = request;
     this._nfcEnrollmentConfigurationError = undefined;
-    this._nfcEnrollmentConfigurationNotice = undefined;
+    this._nfcEnrollmentConfigurationNotice = automatic
+      ? "Finding your secure address in Home Assistant…" : "Saving your secure address…";
     this._render();
     let ready = false;
     try {
-      await this._hass.callWS({
+      const result = await this._hass.callWS({
         type: "call_service",
         domain: DOMAIN,
         service: CONFIGURE_NFC_ACTION,
-        service_data: { nfc_public_origin: publicOrigin },
+        service_data: automatic ? {} : { nfc_public_origin: publicOrigin },
         return_response: true,
       });
+      if (this._nfcEnrollmentConfigurationRequest !== request) return;
+      if (!result.response?.public_origin) {
+        this._nfcEnrollmentConfigurationError =
+          "HomePASS could not find your Cloud address. In Home Assistant, open Settings → Home Assistant Cloud, enable Remote access, then try again or enter the HTTPS address below.";
+        this._nfcEnrollmentConfigurationNotice = undefined;
+        return;
+      }
+      this._nfcEnrollmentOriginDraft = result.response.public_origin;
       this._nfcEnrollmentConfigurationNotice =
         "Address saved. HomePASS is enabling NFC…";
       this._render();
       const deadline = Date.now() + 15000;
       while (Date.now() < deadline) {
+        if (this._nfcEnrollmentConfigurationRequest !== request) return;
         if (this._nfcEnrollmentServicesAvailable()) {
           ready = true;
           break;
         }
         await new Promise((resolve) => window.setTimeout(resolve, 500));
       }
+      if (this._nfcEnrollmentConfigurationRequest !== request) return;
       if (!ready) {
         this._nfcEnrollmentConfigurationNotice =
           "The address is saved. HomePASS is still enabling NFC; try Continue again in a moment.";
       }
     } catch (_error) {
+      if (this._nfcEnrollmentConfigurationRequest !== request) return;
       this._nfcEnrollmentConfigurationError =
-        "HomePASS could not save this address. Check it and try again.";
+        automatic ? "HomePASS could not check the Cloud address. Try again or enter the HTTPS address below."
+          : "HomePASS could not save this address. Check it and try again.";
       this._nfcEnrollmentConfigurationNotice = undefined;
     } finally {
-      this._nfcEnrollmentConfiguring = false;
-      if (this._detailsPersonId === personId) this._render();
+      if (this._nfcEnrollmentConfigurationRequest === request) {
+        this._nfcEnrollmentConfiguring = false;
+        if (this._detailsPersonId === personId) this._render();
+      }
     }
-    if (!ready || this._detailsPersonId !== personId) return;
+    if (!ready || this._detailsPersonId !== personId ||
+      this._nfcEnrollmentConfigurationRequest !== request) return;
     this._nfcEnrollmentSetupOpen = false;
+    this._nfcEnrollmentConfigurationRequest = undefined;
     this._nfcEnrollmentOriginDraft = "";
     this._nfcEnrollmentConfigurationNotice = undefined;
     await this._loadNfcEnrollment(personId);
@@ -13030,6 +13079,13 @@ class HomePassPanel extends HTMLElement {
     if (this._nfcEnrollmentSetupOpen) {
       const setupHeading = document.createElement("h3");
       setupHeading.textContent = "NFC setup required";
+      if (this._nfcEnrollmentConfiguring) {
+        const status = document.createElement("p");
+        status.setAttribute("role", "status");
+        status.textContent = this._nfcEnrollmentConfigurationNotice;
+        card.append(setupHeading, status);
+        return card;
+      }
       const explanation = document.createElement("p");
       explanation.textContent =
         "HomePASS needs the secure Nabu Casa HTTPS address before it can create an NFC enrollment link.";
@@ -13065,6 +13121,10 @@ class HomePassPanel extends HTMLElement {
       }
       const actions = document.createElement("div");
       actions.className = "nfc-enrollment-actions";
+      const retry = document.createElement("ha-button");
+      retry.setAttribute("appearance", "plain");
+      retry.textContent = "Try automatic setup again";
+      retry.addEventListener("click", () => void this._configureNfcEnrollment({ automatic: true }));
       const continueButton = document.createElement("ha-button");
       continueButton.setAttribute("appearance", "filled");
       continueButton.disabled =
@@ -13083,7 +13143,7 @@ class HomePassPanel extends HTMLElement {
         this._nfcEnrollmentConfigurationError = undefined;
         continueButton.disabled = !input.value.trim();
       });
-      actions.append(continueButton, cancel);
+      actions.append(retry, continueButton, cancel);
       card.append(actions);
       return card;
     }

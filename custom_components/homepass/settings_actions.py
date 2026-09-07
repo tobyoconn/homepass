@@ -12,6 +12,7 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError, Unauthorized
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import (
     ATTR_PREFERENCES,
@@ -102,12 +103,40 @@ def async_register_settings_actions(
         user = await hass.auth.async_get_user(call.context.user_id)
         if user is None or not user.is_admin:
             raise Unauthorized(context=call.context)
-        try:
-            public_origin = normalize_public_origin(str(call.data[CONF_NFC_PUBLIC_ORIGIN]))
-        except (KeyError, TypeError, ValueError) as err:
-            raise ServiceValidationError(
-                "Enter a bare HTTPS address without a path, query, or sign-in details"
-            ) from err
+        if CONF_NFC_PUBLIC_ORIGIN not in call.data:
+            # Discovery is only a first-time setup action. Never rotate an origin
+            # already used by physical tags and registered passkeys.
+            if public_origin := entry.options.get(CONF_NFC_PUBLIC_ORIGIN):
+                return cast(
+                    "ServiceResponse",
+                    {"public_origin": public_origin, "reload_pending": False},
+                )
+            try:
+                public_origin = normalize_public_origin(
+                    get_url(
+                        hass,
+                        require_cloud=True,
+                        require_ssl=True,
+                        allow_internal=False,
+                        allow_ip=False,
+                    )
+                )
+            except NoURLAvailableError, ValueError:
+                return cast(
+                    "ServiceResponse",
+                    {
+                        "public_origin": None,
+                        "reload_pending": False,
+                        "reason": "cloud_unavailable",
+                    },
+                )
+        else:
+            try:
+                public_origin = normalize_public_origin(str(call.data[CONF_NFC_PUBLIC_ORIGIN]))
+            except (KeyError, TypeError, ValueError) as err:
+                raise ServiceValidationError(
+                    "Enter a bare HTTPS address without a path, query, or sign-in details"
+                ) from err
         options = {**entry.options, CONF_NFC_PUBLIC_ORIGIN: public_origin}
         hass.config_entries.async_update_entry(entry, options=options)
         return cast(
@@ -140,7 +169,7 @@ def async_register_settings_actions(
         DOMAIN,
         SERVICE_CONFIGURE_NFC,
         handle_configure_nfc,
-        schema=vol.Schema({vol.Required(CONF_NFC_PUBLIC_ORIGIN): str}),
+        schema=vol.Schema({vol.Optional(CONF_NFC_PUBLIC_ORIGIN): str}),
         supports_response=SupportsResponse.ONLY,
     )
 
