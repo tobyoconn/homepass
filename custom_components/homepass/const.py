@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "homepass"
 NAME: Final = "HomePASS"
-VERSION: Final = "1.18.2"
+VERSION: Final = "1.18.3"
 STORAGE_KEY: Final = f"{DOMAIN}.registry"
 STORAGE_VERSION: Final = 1
 STORAGE_MINOR_VERSION: Final = 0

@@ -39,8 +39,11 @@ controls and entry action, confirms, and saves. Disabling Open requires entry to
 If live Open capability disappears, an Open entry request fails instead of silently sending
 an insufficient Unlock command. Garage and strike control profiles retain their behaviour.
 
-For manual app control, an enabled lock presents explicit **Unlock** and **Open Door** choices
-on each operation, followed by the existing slide confirmation. Open dispatches `lock.open`.
+For manual app control, an enabled lock presents two independent sliders: **Slide to Unlock**
+(leave the latch engaged) and **Slide to Open Door** (briefly retract the latch). Completing
+the chosen slider confirms that action directly. Once unlocked, the first slider becomes
+**Slide to Lock**. Only one gesture or command can be active at a time. Doors without Open
+permission or capability keep their single state-appropriate slider. Open dispatches `lock.open`.
 An `unlocked` state does not confirm latch retraction: confirmation waits for the lock's
 `open` state. Activity records latch release separately from a contact sensor reporting that
 the door physically opened, retaining HomePASS command/credential attribution.

@@ -56,17 +56,19 @@ test('binary battery and absent values never fabricate zero percent', () => {
   assert.equal(p._batteryReading(p._hass, 'lock.example').status, 'unknown');
 });
 
-test('manual control requires a fresh explicit choice and preserves unlock-only doors', () => {
+test('manual sliders offer distinct operations and preserve unlock-only doors', () => {
   const p = panel();
   p._selectedDoor = { control_profile: 'lock', lock_state: 'locked', availability: 'available', supports_open: true, open_enabled: true, entry_action: 'open' };
-  assert.equal(p._availableDoorOperation(), undefined);
-  p._manualEntryChoice = 'unlock';
   assert.equal(p._availableDoorOperation().service, 'unlock_access_point');
-  p._manualEntryChoice = 'open';
-  assert.equal(p._availableDoorOperation().service, 'open_access_point');
-  assert.equal(p._availableDoorOperation().targetState, 'open');
+  assert.equal(p._availableDoorOperation('open').service, 'open_access_point');
+  assert.equal(p._availableDoorOperation('open').targetState, 'open');
+  p._selectedDoor.lock_state = 'unlocked';
+  assert.equal(p._availableDoorOperation().service, 'lock_access_point');
+  assert.equal(p._availableDoorOperation('open').service, 'open_access_point');
+  p._selectedDoor.lock_state = 'locked';
   p._selectedDoor.open_enabled = false;
   assert.equal(p._availableDoorOperation().service, 'unlock_access_point');
+  assert.equal(p._availableDoorOperation('open'), undefined);
 });
 
 test('onboarding suggestions require confirmation and never add questions to lock-only doors', () => {
