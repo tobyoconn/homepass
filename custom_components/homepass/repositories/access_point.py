@@ -198,7 +198,11 @@ class AccessPointRepository:
         if (
             not isinstance(stored_id, str)
             or not isinstance(record, Mapping)
-            or set(record) != _ACCESS_POINT_FIELDS
+            or set(record)
+            not in (
+                _ACCESS_POINT_FIELDS,
+                _ACCESS_POINT_FIELDS | {"open_enabled", "entry_action"},
+            )
         ):
             raise StorageError("Stored Access Point record is invalid")
         try:
