@@ -8,8 +8,8 @@
 - Added daily real-startup checks against the latest stable and beta Home Assistant
   images, including dependency installation, the panel, ping, unload and reload.
   HomePASS Core API deprecation reports now fail compatibility validation early.
-- Added a guard against overriding Core-owned dependencies, and made release publication
-  wait for successful validation and security checks on the tagged source.
+- Added a guard against overriding Core-owned dependencies. New versions merged to `main`
+  now publish automatically after validation and security checks pass on that exact commit.
 
 ## [1.18.8] - 2026-10-09
 

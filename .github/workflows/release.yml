@@ -2,6 +2,8 @@ name: Publish release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
 
@@ -28,14 +30,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Verify tag matches integration version
+      - name: Verify release version
+        id: version
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          PUSHED_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
         run: |
           python - <<'PY'
           import ast
           import json
           import os
+          import re
           import tomllib
           from pathlib import Path
 
@@ -56,21 +60,35 @@ jobs:
           if internal_version != manifest["version"] or project["project"]["version"] != manifest["version"]:
               raise SystemExit("Internal, manifest and project versions must match")
           expected = f"v{manifest['version']}"
-          actual = os.environ["RELEASE_TAG"]
-          if actual != expected:
+          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", expected):
+              raise SystemExit(f"Invalid stable release version: {expected!r}")
+          actual = os.environ["PUSHED_TAG"]
+          if actual and actual != expected:
               raise SystemExit(
                   f"Release tag {actual!r} does not match manifest version {expected!r}"
               )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"tag={expected}\n")
           PY
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release $RELEASE_TAG already exists."
           else
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$RELEASE_SHA" >/dev/null
+            fi
+            tagged_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
+            if [ "$tagged_sha" != "$RELEASE_SHA" ]; then
+              echo "Refusing to publish: tag points to a different, unvalidated commit."
+              exit 1
+            fi
             gh release create "$RELEASE_TAG" \
               --verify-tag \
               --title "HomePASS ${RELEASE_TAG#v}" \

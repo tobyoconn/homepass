@@ -16,8 +16,9 @@ Every push and pull request runs these independent jobs:
 - the separate repository-privacy and Gitleaks workflows.
 
 Validation also runs daily so upstream releases are checked without a HomePASS code change.
-The release workflow reuses validation and security checks on the tagged source and waits for
-them to succeed before publishing. A generic dependency-ownership check rejects requirements
+The release workflow reuses validation and security checks on the exact source commit and waits
+for them to succeed before publishing a new version merged to `main` or a pushed version tag.
+A generic dependency-ownership check rejects requirements
 already supplied by the installed Core version. Regression tests include the duplicate
 cryptography requirement responsible for the October 2026 startup outage.
 Core API deprecation reports attributed to HomePASS fail the startup check, providing an

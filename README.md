@@ -66,11 +66,14 @@ Manual development installations do not receive HACS-managed updates.
 1. Update the version in `custom_components/homepass/manifest.json`,
    `custom_components/homepass/const.py`, and `pyproject.toml` together.
 2. Add the release notes to `CHANGELOG.md`.
-3. Merge the tested changes.
-4. Create and push a matching tag such as `v1.16.5`.
-5. The release workflow reruns validation and security checks on the tagged source, including
-   real startup tests on the latest stable and beta Home Assistant images. It publishes the
-   GitHub release used by HACS only after every required job passes and all version fields match.
+3. Merge the tested changes to `main`.
+4. The release workflow reruns validation and security checks on that exact commit, including
+   real startup tests on the latest stable and beta Home Assistant images. When the version is
+   new, it creates the matching tag and GitHub release used by HACS only after every required
+   job passes and all version fields match. An already published version is left unchanged.
+
+Pushing a version tag also uses the same gates. Publication rejects any existing unpublished
+tag that points to a different commit from the one validated.
 
 Published version tags are immutable. Fixes are released under a new version.
 
