@@ -66,12 +66,38 @@ Manual development installations do not receive HACS-managed updates.
 1. Update the version in `custom_components/homepass/manifest.json`,
    `custom_components/homepass/const.py`, and `pyproject.toml` together.
 2. Add the release notes to `CHANGELOG.md`.
-3. Merge the tested changes.
-4. Create and push a matching tag such as `v1.16.5`.
-5. The release workflow verifies that the tag matches the manifest and publishes the GitHub
-   release used by HACS.
+3. Merge the tested changes to `main`.
+4. The release workflow reruns validation and security checks on that exact commit, including
+   real startup tests on the latest stable and beta Home Assistant images. When the version is
+   new, it creates the matching tag and GitHub release used by HACS only after every required
+   job passes and all version fields match. An already published version is left unchanged.
+
+Pushing a version tag also uses the same gates. Publication rejects any existing unpublished
+tag that points to a different commit from the one validated.
 
 Published version tags are immutable. Fixes are released under a new version.
+
+## Home Assistant compatibility
+
+HomePASS must not pin libraries already supplied by Home Assistant Core. The 1.18.8 fix
+removed a duplicate `cryptography` requirement that prevented startup after a Core update.
+Current validation rejects any equivalent Core-owned requirement, even when its version
+happens to match today.
+
+The **Validate** workflow runs daily, on changes, and before publishing a release. In addition
+to the pinned unit-test environment, it boots HomePASS inside the latest official Home Assistant
+**stable** and **beta** containers, using the real dependency installer. It checks configuration,
+startup, panel registration, a harmless ping, unload, and reload with synthetic data.
+Core API deprecation reports about HomePASS also fail the check before their removal deadline.
+Failed compatibility checks block automated release publication. Review scheduled failures in
+[GitHub Actions](https://github.com/tobyoconn/homepass/actions/workflows/validate.yml) before
+upgrading Home Assistant. Beta testing provides advance warning; it cannot cover every device,
+provider, or future upstream change.
+
+For property upgrades, create a backup, install available HomePASS fixes first, then update one
+Home Assistant instance and verify its HomePASS dashboard, devices, and access methods before
+updating the remaining instances. See [Development Setup](DEVELOPMENT_SETUP.md) to run the
+same compatibility checks locally.
 
 See [Architecture](docs/architecture.md), [Security](docs/security.md), and
 [Roadmap](ROADMAP.md).

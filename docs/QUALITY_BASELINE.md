@@ -8,10 +8,21 @@ It is intentionally free of installation, property, device, network, credential,
 Every push and pull request runs these independent jobs:
 
 - the complete pytest suite;
+- real startup, panel, ping, unload and reload checks in the latest official Home Assistant
+  stable and beta containers, using Core's dependency installer without test-fixture bypasses;
 - Ruff correctness checks;
 - a strict mypy ratchet over the security-critical vault, authorization, and schedule core;
 - Hassfest;
 - the separate repository-privacy and Gitleaks workflows.
+
+Validation also runs daily so upstream releases are checked without a HomePASS code change.
+The release workflow reuses validation and security checks on the exact source commit and waits
+for them to succeed before publishing a new version merged to `main` or a pushed version tag.
+A generic dependency-ownership check rejects requirements
+already supplied by the installed Core version. Regression tests include the duplicate
+cryptography requirement responsible for the October 2026 startup outage.
+Core API deprecation reports attributed to HomePASS fail the startup check, providing an
+early warning before the deprecated API is removed.
 
 The Ruff gate initially enables `E9`, `F63`, `F7`, and `F82`. These rules reject syntax
 errors, invalid control flow, undefined names, and related correctness defects.
@@ -30,9 +41,10 @@ requests reach zero findings.
 
 ## Python and mypy baseline
 
-HomePASS validation targets Python 3.14 and the corresponding current Home Assistant test line.
-This matches the integration's current runtime dependency set; the older Python 3.13 Home Assistant
-line pins an incompatible cryptography version.
+HomePASS unit-test validation targets Python 3.14 and the fixed Home Assistant test line selected
+by `requirements-dev.txt`. Current compatibility is checked separately with floating stable/beta
+images, which supply their own Python runtime. Core owns shared dependencies such as cryptography;
+HomePASS must not override their versions in its integration manifest or validation requirements.
 
 A full strict mypy audit over `custom_components/homepass` and `tests` reported 155 errors in
 27 files. Most test findings are missing annotations or intentionally loose mock types. Production

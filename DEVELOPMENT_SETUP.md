@@ -3,9 +3,9 @@
 | Field | Value |
 | --- | --- |
 | Status | Active |
-| Version | 1.0 |
+| Version | 1.1 |
 | Owner | HomePASS contributors |
-| Last updated | 2026-07-15 |
+| Last updated | 2026-10-09 |
 
 This guide creates an isolated local environment for developing and testing HomePASS. Do
 not use a production Home Assistant configuration or real access credentials for development.
@@ -33,7 +33,7 @@ reports that `rustc` or `cargo` is missing:
 brew install rust
 ```
 
-HomePASS requires Python 3.13 or later. Current Home Assistant development may require a
+HomePASS requires Python 3.14 or later. Current Home Assistant development may require a
 newer patch release, so confirm the requirement in the
 [Home Assistant development-environment guide](https://developers.home-assistant.io/docs/development_environment/)
 before creating the environment:
@@ -72,21 +72,18 @@ python -m pip --version
 
 ## 3. Install Home Assistant and development tools
 
-The repository does not yet provide a locked development requirements file. Install the
-minimum local toolchain directly:
+Install the repository's pinned validation environment:
 
 ```bash
-python -m pip install \
-  homeassistant \
-  pytest \
-  pytest-homeassistant-custom-component \
-  ruff \
-  pre-commit
+python -m pip install -r requirements-dev.txt
+python -m pip install pre-commit
 ```
 
 `pytest-homeassistant-custom-component` supplies Home Assistant's test fixtures for custom
-integrations, including the `hass` fixture used by HomePASS tests. Let `pip` resolve a
-compatible Home Assistant and plugin version together; do not force incompatible versions.
+integrations, including the `hass` fixture used by HomePASS tests. Its pinned version selects
+the unit-test Home Assistant version. This reproducible baseline is separate from the current
+stable/beta startup checks below; do not treat a passing pinned suite as proof of compatibility
+with a newer Core release. Do not add a separate pin for Core-owned dependencies.
 
 Confirm the installation:
 
@@ -129,7 +126,7 @@ ruff check . --fix
 ruff format .
 ```
 
-HomePASS targets Python 3.13 and a 100-character line length. Home Assistant also uses Ruff
+HomePASS targets Python 3.14 and a 100-character line length. Home Assistant also uses Ruff
 for formatting; see its [style guidelines](https://developers.home-assistant.io/docs/development_guidelines/).
 
 ## 6. Configure pre-commit
@@ -168,6 +165,24 @@ Home Assistant documents hassfest validation for custom integrations in its
 [developer guidance](https://developers.home-assistant.io/blog/2020/04/16/hassfest/).
 
 ## 8. Start a disposable Home Assistant instance
+
+First run the same real-startup compatibility check used by CI:
+
+```bash
+docker run --rm --pull always --entrypoint python \
+  -v "$PWD:/work:ro" -w /work \
+  ghcr.io/home-assistant/home-assistant:stable scripts/check_ha_compatibility.py
+docker run --rm --pull always --entrypoint python \
+  -v "$PWD:/work:ro" -w /work \
+  ghcr.io/home-assistant/home-assistant:beta scripts/check_ha_compatibility.py
+```
+
+These checks use the image's Python and Home Assistant versions, including the real dependency
+installer and constraints. The repository is mounted read-only; configuration and vault data
+are temporary and synthetic. No ports, host devices, production configuration, or credentials
+are passed through. The logs record the exact Core and cryptography versions tested.
+
+For interactive development:
 
 Use a separate configuration directory and link the working integration into it:
 
