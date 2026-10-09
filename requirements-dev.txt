@@ -14,5 +14,5 @@ async-timeout==5.0.1
 
 # Project quality tools and third-party typing.
 mypy==2.3.0
-ruff==0.15.20
+ruff==0.16.4
 types-qrcode
