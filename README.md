@@ -85,6 +85,7 @@ The **Validate** workflow runs daily, on changes, and before publishing a releas
 to the pinned unit-test environment, it boots HomePASS inside the latest official Home Assistant
 **stable** and **beta** containers, using the real dependency installer. It checks configuration,
 startup, panel registration, a harmless ping, unload, and reload with synthetic data.
+Core API deprecation reports about HomePASS also fail the check before their removal deadline.
 Failed compatibility checks block automated release publication. Review scheduled failures in
 [GitHub Actions](https://github.com/tobyoconn/homepass/actions/workflows/validate.yml) before
 upgrading Home Assistant. Beta testing provides advance warning; it cannot cover every device,

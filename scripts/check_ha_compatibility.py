@@ -6,6 +6,7 @@ dependency-install bypasses, host devices, credentials, or production config are
 
 import asyncio
 from importlib.metadata import version
+import logging
 from pathlib import Path
 import shutil
 from tempfile import TemporaryDirectory
@@ -20,6 +21,19 @@ from check_core_requirements import check_core_requirements
 
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = "homepass"
+
+
+class HomePassCompatibilityWarnings(logging.Handler):
+    """Turn Core API deprecation reports into an actionable compatibility failure."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        message = record.getMessage()
+        if "custom integration 'homepass'" in message:
+            self.messages.append(message)
 
 
 async def check_startup(config_dir: str) -> None:
@@ -62,8 +76,16 @@ async def check_startup(config_dir: str) -> None:
 
 async def run_check(config_dir: str) -> None:
     """Fail a hung startup rather than leave a misleading successful check."""
-    async with asyncio.timeout(300):
-        await check_startup(config_dir)
+    logger = logging.getLogger("homeassistant.helpers.frame")
+    compatibility_warnings = HomePassCompatibilityWarnings()
+    logger.addHandler(compatibility_warnings)
+    try:
+        async with asyncio.timeout(300):
+            await check_startup(config_dir)
+        assert not compatibility_warnings.messages, "\n".join(compatibility_warnings.messages)
+        print("PASS: no HomePASS Core API deprecation reports", flush=True)
+    finally:
+        logger.removeHandler(compatibility_warnings)
 
 
 def main() -> None:

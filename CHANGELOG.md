@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.18.9] - 2026-10-09
+
+- Updated device discovery to use Home Assistant's current device-registry API while
+  retaining support for the older mapping API. This removes a deprecation scheduled
+  to become an error in Home Assistant 2027.9.
+- Added daily real-startup checks against the latest stable and beta Home Assistant
+  images, including dependency installation, the panel, ping, unload and reload.
+  HomePASS Core API deprecation reports now fail compatibility validation early.
+- Added a guard against overriding Core-owned dependencies, and made release publication
+  wait for successful validation and security checks on the tagged source.
+
 ## [1.18.8] - 2026-10-09
 
 - Fixed HomePASS failing to load when Home Assistant requires a newer version of

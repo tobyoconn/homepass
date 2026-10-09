@@ -20,6 +20,8 @@ The release workflow reuses validation and security checks on the tagged source 
 them to succeed before publishing. A generic dependency-ownership check rejects requirements
 already supplied by the installed Core version. Regression tests include the duplicate
 cryptography requirement responsible for the October 2026 startup outage.
+Core API deprecation reports attributed to HomePASS fail the startup check, providing an
+early warning before the deprecated API is removed.
 
 The Ruff gate initially enables `E9`, `F63`, `F7`, and `F82`. These rules reject syntax
 errors, invalid control flow, undefined names, and related correctness defects.

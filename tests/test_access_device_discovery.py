@@ -38,8 +38,10 @@ class _Entities(dict[str, SimpleNamespace]):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("legacy_mapping", [False, True])
 async def test_discovers_observed_zigbee2mqtt_frient_registry_shape(
     monkeypatch: pytest.MonkeyPatch,
+    legacy_mapping: bool,
 ) -> None:
     device = SimpleNamespace(
         id="mqtt-device-id",
@@ -75,7 +77,7 @@ async def test_discovers_observed_zigbee2mqtt_frient_registry_shape(
     )
     monkeypatch.setattr(
         "custom_components.homepass.access_device_discovery.dr.async_get",
-        lambda _hass: SimpleNamespace(devices={device.id: device}),
+        lambda _hass: SimpleNamespace(devices={device.id: device} if legacy_mapping else (device,)),
     )
     monkeypatch.setattr(
         "custom_components.homepass.access_device_discovery.er.async_get",
@@ -96,8 +98,10 @@ async def test_discovers_observed_zigbee2mqtt_frient_registry_shape(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("legacy_mapping", [False, True])
 async def test_rejects_generic_mqtt_keypad_without_complete_action_contract(
     monkeypatch: pytest.MonkeyPatch,
+    legacy_mapping: bool,
 ) -> None:
     device = SimpleNamespace(
         id="mqtt-device-id",
@@ -121,7 +125,7 @@ async def test_rejects_generic_mqtt_keypad_without_complete_action_contract(
     hass = SimpleNamespace(states=_States({}))
     monkeypatch.setattr(
         "custom_components.homepass.access_device_discovery.dr.async_get",
-        lambda _hass: SimpleNamespace(devices={device.id: device}),
+        lambda _hass: SimpleNamespace(devices={device.id: device} if legacy_mapping else (device,)),
     )
     monkeypatch.setattr(
         "custom_components.homepass.access_device_discovery.er.async_get",

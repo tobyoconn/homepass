@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -67,7 +68,11 @@ class HomeAssistantAccessDeviceDiscovery:
         device_registry = dr.async_get(self._hass)
         entity_registry = er.async_get(self._hass)
         discovered: list[DiscoveredAccessDevice] = []
-        for device in device_registry.devices.values():
+        devices = device_registry.devices
+        # Older Core exposes a mapping; current Core exposes an iterable of entries.
+        # Do not probe .values() on the new view: accessing it is itself deprecated.
+        device_entries = devices.values() if isinstance(devices, Mapping) else devices
+        for device in device_entries:
             manufacturer = (device.manufacturer or "").strip()
             model = (device.model or "").strip()
             model_id = (getattr(device, "model_id", None) or "").strip()
