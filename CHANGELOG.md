@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.18.8] - 2026-10-09
+
+- Fixed HomePASS failing to load when Home Assistant requires a newer version of
+  cryptography, including 50.0.1. HomePASS now accepts Home Assistant's selected
+  version instead of declaring its own cryptography requirement.
+- Existing HomePASS data is preserved. Update through HACS and restart Home
+  Assistant on each instance.
+
 ## [1.18.7] - 2026-09-07
 
 - **Check Nuki now** now reports whether the lock returned no recent activity,
