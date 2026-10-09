@@ -6,12 +6,24 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
-  contents: write
+  contents: read
+  pull-requests: read
 
 jobs:
+  validation:
+    name: Validate tagged source
+    uses: ./.github/workflows/validate.yml
+
+  security:
+    name: Check tagged source security
+    uses: ./.github/workflows/security.yml
+
   release:
     name: Publish GitHub release
+    needs: [validation, security]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

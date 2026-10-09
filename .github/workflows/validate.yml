@@ -6,11 +6,33 @@ on:
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
+  compatibility:
+    name: Home Assistant ${{ matrix.channel }} startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [stable, beta]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Boot HomePASS with current Home Assistant and real dependency constraints
+        env:
+          HA_CHANNEL: ${{ matrix.channel }}
+        run: |
+          docker run --rm --pull always \
+            --entrypoint python \
+            -v "$PWD:/work:ro" -w /work \
+            "ghcr.io/home-assistant/home-assistant:$HA_CHANNEL" \
+            scripts/check_ha_compatibility.py
+
   pytest:
     name: Pytest
     runs-on: ubuntu-latest
